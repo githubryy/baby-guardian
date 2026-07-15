@@ -15,21 +15,23 @@ exports.main = async (event, context) => {
       .limit(1)
       .get();
     if (users.length === 0) return fail('用户不存在，请重新登录');
-    const userId = users[0]._id;
+    const currentUser = users[0];
+    const userId = currentUser._id;
+    const familyId = currentUser.familyId || userId;
 
     switch (action) {
       case 'list':
-        return await handleList(userId);
+        return await handleList(userId, familyId);
       case 'detail':
         return await handleDetail(event.babyId);
       case 'add':
-        return await handleAdd(userId, event.data);
+        return await handleAdd(userId, familyId, event.data);
       case 'update':
         return await handleUpdate(event.babyId, event.data);
       case 'delete':
         return await handleDelete(event.babyId);
       case 'setActive':
-        return await handleSetActive(userId, event.babyId);
+        return await handleSetActive(userId, familyId, event.babyId);
       default:
         return fail(`未知操作: ${action}`);
     }
@@ -39,10 +41,11 @@ exports.main = async (event, context) => {
   }
 };
 
-/** 获取宝宝列表 */
-async function handleList(userId) {
+/** 获取宝宝列表（按家庭查询，兼容 V1.0 单用户模式） */
+async function handleList(userId, familyId) {
+  // V2.0: 按 familyId 查询家庭共享的宝宝
   const { data } = await db.collection('babies')
-    .where({ userId })
+    .where(_.or([{ familyId }, { userId: familyId }]))
     .orderBy('createdAt', 'asc')
     .get();
   return success(data);
@@ -55,11 +58,13 @@ async function handleDetail(babyId) {
 }
 
 /** 添加宝宝 */
-async function handleAdd(userId, data) {
+async function handleAdd(userId, familyId, data) {
   const now = nowISO();
   const baby = {
     ...data,
     userId,
+    familyId,
+    createdBy: userId,
     isActive: false,
     createdAt: now,
     updatedAt: now,
@@ -67,7 +72,9 @@ async function handleAdd(userId, data) {
   const { _id } = await db.collection('babies').add({ data: baby });
 
   // 如果是第一个宝宝，设为活跃
-  const { total } = await db.collection('babies').where({ userId }).count();
+  const { total } = await db.collection('babies')
+    .where(_.or([{ familyId }, { userId: familyId }]))
+    .count();
   if (total === 1) {
     await db.collection('babies').doc(_id).update({ data: { isActive: true } });
     baby.isActive = true;
@@ -104,10 +111,10 @@ async function handleDelete(babyId) {
 }
 
 /** 设置当前活跃宝宝 */
-async function handleSetActive(userId, babyId) {
-  // 先取消所有活跃状态
+async function handleSetActive(userId, familyId, babyId) {
+  // 先取消家庭内所有活跃状态
   await db.collection('babies')
-    .where({ userId, isActive: true })
+    .where(_.or([{ familyId, isActive: true }, { userId: familyId, isActive: true }]))
     .update({ data: { isActive: false } });
 
   // 设置新的活跃宝宝

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app';
 import { useUserStore } from '@/stores/user';
+import { useFamilyStore } from '@/stores/family';
 
 onLaunch(() => {
   console.log('App Launch - 宝宝守护者');
@@ -13,7 +14,13 @@ onLaunch(() => {
   }
   // 尝试静默登录
   const userStore = useUserStore();
-  userStore.initLogin();
+  const familyStore = useFamilyStore();
+  userStore.initLogin().then(() => {
+    // 登录成功后加载家庭信息
+    if (userStore.isLogin) {
+      familyStore.loadFamily();
+    }
+  });
 });
 
 onShow(() => {

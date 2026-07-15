@@ -105,7 +105,7 @@ exports.main = async (event, context) => {
           },
         });
         // 记录日志
-        await logNotification(task, 'success', null, null, 0, 'red_dot_only');
+        await logNotification(task, null, 'success', null, 0, 'red_dot_only');
         return;
       }
 
@@ -121,33 +121,36 @@ exports.main = async (event, context) => {
             retryCount: task.retryCount + 1,
           },
         });
-        await logNotification(task, 'success', null, null, task.retryCount, 'red_dot_retry');
+        await logNotification(task, null, 'success', null, task.retryCount, 'red_dot_retry');
         return;
       }
 
-      // 4d. 检查配额
-      const quota = await getAvailableQuota(task);
-      if (!quota) {
-        console.log(`[cron-scan] 事项 ${task._id} 配额不足`);
+      // 4d. 获取家庭所有成员的配额
+      const familyQuotas = await getFamilyQuotas(task);
+      if (familyQuotas.length === 0) {
+        console.log(`[cron-scan] 事项 ${task._id} 家庭配额不足`);
         quotaExhausted++;
-        await logNotification(task, 'quota_exhausted', null, null, 0);
+        await logNotification(task, null, 'quota_exhausted', null, 0);
 
-        // 重置提醒时间 (等待用户补充配额后下次扫描再推)
-        const nextTime = new Date(now.getTime() + 30 * 60 * 1000); // 30分钟后重试
+        const nextTime = new Date(now.getTime() + 30 * 60 * 1000);
         await db.collection('reminder_tasks').doc(task._id).update({
           data: { nextRemindTime: nextTime.toISOString() },
         });
         return;
       }
 
-      // 4e. 发送订阅消息
-      const sendResult = await sendSubscriptionMessage(task, quota);
-      await logNotification(task, sendResult.status, quota._id, sendResult.error, 0);
+      // 4e. 向有配额的家庭成员发送订阅消息
+      let anySuccess = false;
+      for (const fq of familyQuotas) {
+        const sendResult = await sendSubscriptionMessage(task, fq);
+        await logNotification(task, fq, sendResult.status, sendResult.error, 0);
 
-      if (sendResult.status === 'success') {
-        pushed++;
-        // 消耗配额
-        await consumeQuota(quota._id, task._id);
+        if (sendResult.status === 'success') {
+          pushed++;
+          anySuccess = true;
+          // 消耗配额
+          await consumeQuota(fq.quotaId, task._id);
+        }
       }
 
       // 4f. 更新事项: 设置下次提醒时间 + retryCount
@@ -208,42 +211,66 @@ async function unlockStaleTasks(now) {
 }
 
 /**
- * 获取可用配额
+ * 获取家庭所有成员的可用配额
+ * V2.0: 向所有家庭成员推送，只要有一个人有配额就推送
  */
-async function getAvailableQuota(task) {
+async function getFamilyQuotas(task) {
   const templateKey = TYPE_TEMPLATE_MAP[task.type];
-  if (!templateKey) return null;
+  if (!templateKey) return [];
 
   const templateId = TEMPLATES[templateKey];
-  if (!templateId) return null;
+  if (!templateId) return [];
 
-  // 获取用户 openId
-  const { data: user } = await db.collection('users').doc(task.userId).get();
-  if (!user) return null;
+  // 获取家庭信息
+  const familyId = task.familyId || task.userId;
+  const { data: family } = await db.collection('families')
+    .doc(familyId)
+    .get()
+    .catch(() => ({ data: null }));
 
-  const now = nowISO();
+  // 获取家庭所有成员的 userId 和 openId
+  let memberUserIds = [task.userId];
+  if (family && family.members) {
+    memberUserIds = family.members.map(m => m.userId);
+  }
 
-  // 查找可用配额 (未过期)
-  const { data: quotas } = await db.collection('subscription_quotas')
-    .where({
-      openId: user.openId,
-      templateId: templateId,
-      status: 'available',
-      expireAt: _.gt(now),
-    })
-    .orderBy('authorizedAt', 'asc')
-    .limit(1)
+  const { data: memberUsers } = await db.collection('users')
+    .where({ _id: _.in(memberUserIds) })
     .get();
 
-  return quotas.length > 0 ? quotas[0] : null;
+  const now = nowISO();
+  const result = [];
+
+  for (const user of memberUsers) {
+    // 查找该成员的可用配额
+    const { data: quotas } = await db.collection('subscription_quotas')
+      .where({
+        openId: user.openId,
+        templateId: templateId,
+        status: 'available',
+        expireAt: _.gt(now),
+      })
+      .orderBy('authorizedAt', 'asc')
+      .limit(1)
+      .get();
+
+    if (quotas.length > 0) {
+      result.push({
+        quotaId: quotas[0]._id,
+        openId: user.openId,
+        user,
+      });
+    }
+  }
+
+  return result;
 }
 
 /**
  * 发送订阅消息
  */
-async function sendSubscriptionMessage(task, quota) {
+async function sendSubscriptionMessage(task, familyQuota) {
   try {
-    const { data: user } = await db.collection('users').doc(task.userId).get();
     const { data: baby } = await db.collection('babies').doc(task.babyId).get();
 
     const templateKey = TYPE_TEMPLATE_MAP[task.type];
@@ -253,7 +280,7 @@ async function sendSubscriptionMessage(task, quota) {
     const sendData = buildMessageData(task, baby, templateKey);
 
     const result = await cloud.openapi.subscribeMessage.send({
-      touser: user.openId,
+      touser: familyQuota.openId,
       templateId,
       data: sendData,
       miniprogramState: 'formal',
@@ -261,10 +288,10 @@ async function sendSubscriptionMessage(task, quota) {
     });
 
     if (result.errCode === 0) {
-      console.log(`[cron-scan] 推送成功: 事项 ${task._id}`);
+      console.log(`[cron-scan] 推送成功: 事项 ${task._id} → ${familyQuota.user.nickName}`);
       return { status: 'success', error: null };
     } else {
-      console.error(`[cron-scan] 推送失败: 事项 ${task._id}`, result);
+      console.error(`[cron-scan] 推送失败: 事项 ${task._id} → ${familyQuota.openId}`, result);
       return { status: 'failed', error: { code: result.errCode, message: result.errMsg } };
     }
   } catch (err) {
@@ -331,17 +358,17 @@ async function consumeQuota(quotaId, taskId) {
 /**
  * 记录推送日志
  */
-async function logNotification(task, status, quotaId, error, retryRound, method = 'subscribe') {
-  const { data: user } = await db.collection('users').doc(task.userId).get();
-  if (!user) return;
+async function logNotification(task, familyQuota, status, error, retryRound, method = 'subscribe') {
+  const openId = familyQuota?.openId || '';
+  const quotaId = familyQuota?.quotaId || null;
 
   await db.collection('notification_logs').add({
     data: {
       taskId: task._id,
       babyId: task.babyId,
-      openId: user.openId,
+      openId,
       templateId: TEMPLATES[TYPE_TEMPLATE_MAP[task.type]] || '',
-      quotaId: quotaId || null,
+      quotaId,
       sendStatus: status,
       errorCode: error?.code || null,
       errorMessage: error?.message || null,

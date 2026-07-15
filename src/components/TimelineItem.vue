@@ -33,6 +33,23 @@
             <text class="time-text">{{ timeText }}</text>
           </view>
         </view>
+
+        <!-- 完成者信息（家庭协作） -->
+        <view v-if="item.status === 'completed' && item.completedByName" class="operator-row">
+          <view class="operator-avatar" :style="{ background: getRelationBg(item.completedByRelation) }">
+            <image v-if="item.completedByAvatar" :src="item.completedByAvatar" mode="aspectFill" class="op-avatar-img" />
+            <u-icon v-else :name="getRelationIcon(item.completedByRelation)" :size="14" :color="getRelationColor(item.completedByRelation)" />
+          </view>
+          <text class="operator-name">{{ item.completedByName }}</text>
+          <text class="operator-relation" :style="{ color: getRelationColor(item.completedByRelation) }">{{ getRelationName(item.completedByRelation) }}</text>
+          <text class="operator-action">已完成</text>
+        </view>
+
+        <!-- 指定负责人（家庭协作） -->
+        <view v-if="(item.status === 'pending' || item.status === 'overdue') && item.assigneeName" class="assignee-row">
+          <u-icon name="account-fill" :size="12" color="#ccc" />
+          <text class="assignee-text">负责人：{{ item.assigneeName }}</text>
+        </view>
       </view>
 
       <!-- 操作按钮 -->
@@ -56,9 +73,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { TimelineItem } from '@/types';
+import type { TimelineItem, FamilyRelation } from '@/types';
 import { formatTime } from '@/utils/time';
-import { TASK_TYPE_CONFIG } from '@/utils/constants';
+import { TASK_TYPE_CONFIG, FAMILY_RELATION_CONFIG } from '@/utils/constants';
 
 const props = defineProps<{
   item: TimelineItem;
@@ -103,6 +120,24 @@ const dotColor = computed(() => {
   if (props.item.status === 'delayed') return '#ef9f27';
   return props.item.typeColor;
 });
+
+// 家庭身份辅助函数
+function getRelationName(relation?: FamilyRelation) {
+  if (!relation) return '';
+  return FAMILY_RELATION_CONFIG[relation]?.name || '';
+}
+function getRelationIcon(relation?: FamilyRelation) {
+  if (!relation) return 'account-fill';
+  return FAMILY_RELATION_CONFIG[relation]?.uIcon || 'account-fill';
+}
+function getRelationColor(relation?: FamilyRelation) {
+  if (!relation) return '#999';
+  return FAMILY_RELATION_CONFIG[relation]?.color || '#999';
+}
+function getRelationBg(relation?: FamilyRelation) {
+  if (!relation) return '#F5F5F5';
+  return FAMILY_RELATION_CONFIG[relation]?.bgColor || '#F5F5F5';
+}
 </script>
 
 <style lang="scss" scoped>
@@ -221,6 +256,62 @@ const dotColor = computed(() => {
           font-weight: 500;
           font-variant-numeric: tabular-nums;
         }
+      }
+    }
+
+    /* 操作人信息 */
+    .operator-row {
+      display: flex;
+      align-items: center;
+      gap: 8rpx;
+      margin-top: 12rpx;
+      padding: 8rpx 16rpx;
+      background: #f0faf5;
+      border-radius: 12rpx;
+
+      .operator-avatar {
+        width: 36rpx;
+        height: 36rpx;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+
+        .op-avatar-img {
+          width: 100%;
+          height: 100%;
+        }
+      }
+
+      .operator-name {
+        font-size: 24rpx;
+        color: #2d2d2d;
+        font-weight: 500;
+      }
+
+      .operator-relation {
+        font-size: 20rpx;
+        font-weight: 500;
+      }
+
+      .operator-action {
+        font-size: 22rpx;
+        color: #1d9e75;
+        margin-left: auto;
+      }
+    }
+
+    /* 指定负责人 */
+    .assignee-row {
+      display: flex;
+      align-items: center;
+      gap: 6rpx;
+      margin-top: 8rpx;
+
+      .assignee-text {
+        font-size: 22rpx;
+        color: #ccc;
       }
     }
   }

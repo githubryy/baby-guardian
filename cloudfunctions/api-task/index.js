@@ -24,15 +24,17 @@ exports.main = async (event, context) => {
       .limit(1)
       .get();
     if (users.length === 0) return fail('用户不存在');
-    const userId = users[0]._id;
+    const currentUser = users[0];
+    const userId = currentUser._id;
+    const familyId = currentUser.familyId || userId;
 
     switch (action) {
       case 'list':
-        return await handleList(userId, event.babyId);
+        return await handleList(userId, familyId, event.babyId);
       case 'detail':
         return await handleDetail(event.taskId);
       case 'add':
-        return await handleAdd(userId, event.data);
+        return await handleAdd(userId, familyId, event.data);
       case 'update':
         return await handleUpdate(event.taskId, event.data);
       case 'delete':
@@ -40,7 +42,7 @@ exports.main = async (event, context) => {
       case 'toggle':
         return await handleToggle(event.taskId, event.enabled);
       case 'timeline':
-        return await handleTimeline(userId, event.babyId);
+        return await handleTimeline(userId, familyId, event.babyId);
       default:
         return fail(`未知操作: ${action}`);
     }
@@ -50,9 +52,11 @@ exports.main = async (event, context) => {
   }
 };
 
-/** 获取事项列表 */
-async function handleList(userId, babyId) {
-  const query = babyId ? { userId, babyId } : { userId };
+/** 获取事项列表（按家庭查询） */
+async function handleList(userId, familyId, babyId) {
+  const query = babyId
+    ? { familyId, babyId }
+    : { familyId };
   const { data } = await db.collection('reminder_tasks')
     .where(query)
     .orderBy('createdAt', 'asc')
@@ -67,7 +71,7 @@ async function handleDetail(taskId) {
 }
 
 /** 添加事项 */
-async function handleAdd(userId, data) {
+async function handleAdd(userId, familyId, data) {
   const now = new Date();
   const nowIso = nowISO();
 
@@ -91,9 +95,13 @@ async function handleAdd(userId, data) {
   const task = {
     ...data,
     userId,
+    familyId,
     enabled: true,
     nextRemindTime: firstRemindDate.toISOString(),
     lastCompletedTime: null,
+    lastCompletedBy: null,
+    lastCompletedByName: null,
+    lastCompletedByRelation: null,
     retryCount: 0,
     processingLock: false,
     lockedAt: null,
@@ -132,16 +140,19 @@ async function handleToggle(taskId, enabled) {
 /**
  * 获取首页时间线
  * 返回今日待处理 + 近期已完成的事项
+ * V2.0: 按家庭查询，包含操作人信息
  */
-async function handleTimeline(userId, babyId) {
+async function handleTimeline(userId, familyId, babyId) {
   const now = new Date();
   const todayStart = new Date(now);
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date(now);
   todayEnd.setHours(23, 59, 59, 999);
 
-  // 获取该用户的所有宝宝
-  const babyQuery = babyId ? { userId, _id: babyId } : { userId };
+  // 获取家庭内所有宝宝
+  const babyQuery = babyId
+    ? _.or([{ familyId, _id: babyId }, { userId: familyId, _id: babyId }])
+    : _.or([{ familyId }, { userId: familyId }]);
   const { data: babies } = await db.collection('babies')
     .where(babyQuery)
     .get();
@@ -149,24 +160,44 @@ async function handleTimeline(userId, babyId) {
   const babyMap = {};
   babies.forEach((b) => { babyMap[b._id] = b; });
 
-  // 获取今日所有事项的提醒
+  // 获取今日所有事项的提醒（按家庭查询）
   const { data: tasks } = await db.collection('reminder_tasks')
     .where({
-      userId,
+      familyId,
       enabled: true,
       nextRemindTime: _.lte(todayEnd.toISOString()),
     })
     .orderBy('nextRemindTime', 'asc')
     .get();
 
-  // 获取今日确认记录
+  // 获取今日确认记录（按家庭查询）
   const { data: confirmLogs } = await db.collection('confirm_logs')
     .where({
-      userId,
+      familyId,
       completedTime: _.gte(todayStart.toISOString()),
     })
     .orderBy('completedTime', 'desc')
     .get();
+
+  // 构建操作人映射（用于显示谁完成了事项）
+  const confirmByTask = {};
+  confirmLogs.forEach((log) => {
+    if (!confirmByTask[log.taskId]) {
+      confirmByTask[log.taskId] = log;
+    }
+  });
+
+  // 构建家庭成员映射（用于显示指定负责人）
+  let memberMap = {};
+  const { data: family } = await db.collection('families')
+    .doc(familyId)
+    .get()
+    .catch(() => ({ data: null }));
+  if (family && family.members) {
+    family.members.forEach((m) => {
+      memberMap[m.userId] = m;
+    });
+  }
 
   // 构建时间线
   const timeline = [];
@@ -177,6 +208,7 @@ async function handleTimeline(userId, babyId) {
     const baby = babyMap[task.babyId];
     const isConfirmed = confirmedTaskIds.has(task._id);
     const remindTime = new Date(task.nextRemindTime);
+    const confirmLog = confirmByTask[task._id];
 
     let status = 'pending';
     if (isConfirmed) {
@@ -184,6 +216,9 @@ async function handleTimeline(userId, babyId) {
     } else if (remindTime.getTime() < now.getTime()) {
       status = 'overdue';
     }
+
+    // 指定负责人信息
+    const assignee = task.assigneeId ? memberMap[task.assigneeId] : null;
 
     timeline.push({
       taskId: task._id,
@@ -199,6 +234,14 @@ async function handleTimeline(userId, babyId) {
       lastDurationText: task.lastCompletedTime ? getDurationText(task.lastCompletedTime) : null,
       status,
       priority: task.priority,
+      // 操作人信息
+      completedByName: confirmLog?.operatorName || null,
+      completedByAvatar: confirmLog?.operatorAvatar || null,
+      completedByRelation: confirmLog?.operatorRelation || null,
+      completedAt: confirmLog?.completedTime || null,
+      // 指定负责人
+      assigneeName: assignee?.nickName || null,
+      assigneeAvatar: assignee?.avatarUrl || null,
     });
   });
 

@@ -63,6 +63,24 @@
       "style": {
         "navigationBarTitleText": "设置"
       }
+    },
+    {
+      "path": "pages/family/index",
+      "style": {
+        "navigationBarTitleText": "家庭管理"
+      }
+    },
+    {
+      "path": "pages/family/invite",
+      "style": {
+        "navigationBarTitleText": "邀请家人"
+      }
+    },
+    {
+      "path": "pages/family/join",
+      "style": {
+        "navigationBarTitleText": "加入家庭"
+      }
     }
   ],
   "globalStyle": {

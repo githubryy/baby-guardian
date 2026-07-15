@@ -13,6 +13,8 @@ export interface UserSettings {
   quietHoursStart: string;
   /** 免打扰结束时间 (如 "07:00") */
   quietHoursEnd: string;
+  /** 操作通知开关（家庭成员完成事项时通知我） */
+  notifyOnMemberAction?: boolean;
 }
 
 /** 用户表 */
@@ -25,6 +27,8 @@ export interface User {
   settings: UserSettings;
   /** 家庭ID (v1.0 默认=自身用户ID) */
   familyId: string;
+  /** 在家庭中的身份 */
+  relation?: FamilyRelation;
   createdAt: string;
   updatedAt: string;
 }
@@ -38,6 +42,10 @@ export type BabyGender = 'male' | 'female' | 'unknown';
 export interface Baby {
   _id: string;
   userId: string;
+  /** 家庭ID（V2.0 宝宝归属家庭） */
+  familyId?: string;
+  /** 创建者 userId */
+  createdBy?: string;
   name: string;
   avatarUrl?: string;
   gender: BabyGender;
@@ -71,6 +79,10 @@ export interface ReminderTask {
   _id: string;
   babyId: string;
   userId: string;
+  /** 家庭ID（V2.0 冗余字段加速查询） */
+  familyId?: string;
+  /** 指定负责人 userId（可选，多人协作时分配） */
+  assigneeId?: string;
   type: TaskType;
   /** 自定义名称 (type=custom 时使用) */
   customName?: string;
@@ -83,6 +95,10 @@ export interface ReminderTask {
   nextRemindTime: string;
   /** 上次完成时间 */
   lastCompletedTime?: string;
+  /** 上次完成者信息 */
+  lastCompletedBy?: string;
+  lastCompletedByName?: string;
+  lastCompletedByRelation?: FamilyRelation;
   /** 提醒窗口开始 (如 "08:00") */
   reminderWindowStart: string;
   /** 提醒窗口结束 (如 "22:00") */
@@ -118,6 +134,14 @@ export interface ConfirmLog {
   delayMinutes?: number;
   /** 备注 */
   remark?: string;
+  /** 操作人 userId */
+  operatorId?: string;
+  /** 操作人昵称 */
+  operatorName?: string;
+  /** 操作人头像 */
+  operatorAvatar?: string;
+  /** 操作人身份 */
+  operatorRelation?: FamilyRelation;
   createdAt: string;
 }
 
@@ -166,22 +190,52 @@ export interface NotificationLog {
   retryRound: number;
 }
 
-// ==================== 家庭表 (预留) ====================
+// ==================== 家庭表 (V2.0 激活) ====================
 
-export type FamilyRole = 'owner' | 'member';
+/** 家庭角色 */
+export type FamilyRole = 'owner' | 'admin' | 'member';
 
+/** 家庭成员身份关系 */
+export type FamilyRelation =
+  | 'father'        // 爸爸
+  | 'mother'        // 妈妈
+  | 'grandfather'   // 爷爷
+  | 'grandmother'   // 奶奶
+  | 'grandfather_in_law' // 外公
+  | 'grandmother_in_law' // 外婆
+  | 'nanny'         // 育儿阿姨
+  | 'other';        // 其他
+
+/** 家庭成员 */
 export interface FamilyMember {
   userId: string;
   role: FamilyRole;
+  /** 身份关系 */
+  relation: FamilyRelation;
   joinedAt: string;
+  nickName: string;
+  avatarUrl: string;
 }
 
+/** 家庭设置 */
+export interface FamilySettings {
+  /** 成员完成事项时通知其他成员 */
+  notifyOnComplete: boolean;
+  /** 默认提醒接收人 (userId, 空则全员接收) */
+  defaultAssignee: string;
+}
+
+/** 家庭表 */
 export interface Family {
   _id: string;
   name: string;
   ownerUserId: string;
+  /** 6位邀请码 */
+  inviteCode: string;
   members: FamilyMember[];
+  settings: FamilySettings;
   createdAt: string;
+  updatedAt: string;
 }
 
 // ==================== 订阅消息模板 ====================
@@ -250,6 +304,14 @@ export interface TimelineItem {
   /** 状态: pending=待处理, completed=已完成, delayed=已延迟, overdue=已超时 */
   status: 'pending' | 'completed' | 'delayed' | 'overdue';
   priority: TaskPriority;
+  /** 完成者信息 */
+  completedByName?: string;
+  completedByAvatar?: string;
+  completedByRelation?: FamilyRelation;
+  completedAt?: string;
+  /** 指定负责人 */
+  assigneeName?: string;
+  assigneeAvatar?: string;
 }
 
 // ==================== API 通用类型 ====================

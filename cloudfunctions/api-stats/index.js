@@ -23,15 +23,17 @@ exports.main = async (event, context) => {
       .limit(1)
       .get();
     if (users.length === 0) return fail('用户不存在');
-    const userId = users[0]._id;
+    const currentUser = users[0];
+    const userId = currentUser._id;
+    const familyId = currentUser.familyId || userId;
 
     switch (action) {
       case 'summary':
-        return await handleSummary(userId, event.babyId);
+        return await handleSummary(userId, familyId, event.babyId);
       case 'daily':
-        return await handleDaily(userId, event.params);
+        return await handleDaily(userId, familyId, event.params);
       case 'byType':
-        return await handleByType(userId, event.params);
+        return await handleByType(userId, familyId, event.params);
       default:
         return fail(`未知操作: ${action}`);
     }
@@ -42,21 +44,23 @@ exports.main = async (event, context) => {
 };
 
 /** 获取统计概览 */
-async function handleSummary(userId, babyId) {
+async function handleSummary(userId, familyId, babyId) {
   const now = new Date();
   const todayStart = new Date(now);
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date(now);
   todayEnd.setHours(23, 59, 59, 999);
 
-  // 宝宝数量
-  const babyQuery = babyId ? { userId, _id: babyId } : { userId };
+  // 宝宝数量（按家庭查询）
+  const babyQuery = babyId
+    ? _.or([{ familyId, _id: babyId }, { userId: familyId, _id: babyId }])
+    : _.or([{ familyId }, { userId: familyId }]);
   const { total: totalBabies } = await db.collection('babies')
     .where(babyQuery)
     .count();
 
-  // 事项数量
-  const taskQuery = babyId ? { userId, babyId } : { userId };
+  // 事项数量（按家庭查询）
+  const taskQuery = babyId ? { familyId, babyId } : { familyId };
   const { total: totalTasks } = await db.collection('reminder_tasks')
     .where(taskQuery)
     .count();
@@ -74,10 +78,10 @@ async function handleSummary(userId, babyId) {
     .get();
   const todayReminders = todayTasks.length;
 
-  // 今日已完成
+  // 今日已完成（按家庭查询）
   const { data: todayLogs } = await db.collection('confirm_logs')
     .where({
-      userId,
+      familyId,
       action: 'completed',
       completedTime: _.gte(todayStart.toISOString()),
     })
@@ -88,7 +92,7 @@ async function handleSummary(userId, babyId) {
     ? Math.round((todayCompleted / todayReminders) * 100)
     : 0;
 
-  // 获取最近7天统计
+  // 获取最近7天统计（按家庭查询）
   const dates = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
@@ -104,7 +108,7 @@ async function handleSummary(userId, babyId) {
 
     const { data: dayLogs } = await db.collection('confirm_logs')
       .where({
-        userId,
+        familyId,
         completedTime: _.gte(dayStart.toISOString()).and(_.lte(dayEnd.toISOString())),
       })
       .get();
@@ -124,7 +128,7 @@ async function handleSummary(userId, babyId) {
   }));
 
   // 类型统计
-  const typeStats = await getTypeStats(userId, dates[0].toISOString(), now.toISOString());
+  const typeStats = await getTypeStats(familyId, dates[0].toISOString(), now.toISOString());
 
   return success({
     totalBabies,
@@ -138,8 +142,8 @@ async function handleSummary(userId, babyId) {
   });
 }
 
-/** 日统计 */
-async function handleDaily(userId, params) {
+/** 日统计（按家庭查询） */
+async function handleDaily(userId, familyId, params) {
   const { babyId, startDate, endDate } = params;
   const start = new Date(startDate);
   start.setHours(0, 0, 0, 0);
@@ -147,7 +151,7 @@ async function handleDaily(userId, params) {
   end.setHours(23, 59, 59, 999);
 
   const query = {
-    userId,
+    familyId,
     completedTime: _.gte(start.toISOString()).and(_.lte(end.toISOString())),
   };
   if (babyId) query.babyId = babyId;
@@ -180,14 +184,14 @@ async function handleDaily(userId, params) {
 }
 
 /** 类型统计 */
-async function handleByType(userId, params) {
+async function handleByType(userId, familyId, params) {
   const { babyId, startDate, endDate } = params;
-  return success(await getTypeStats(userId, startDate, endDate, babyId));
+  return success(await getTypeStats(familyId, startDate, endDate, babyId));
 }
 
-async function getTypeStats(userId, startDate, endDate, babyId) {
+async function getTypeStats(familyId, startDate, endDate, babyId) {
   const query = {
-    userId,
+    familyId,
     completedTime: _.gte(startDate).and(_.lte(endDate)),
   };
   if (babyId) query.babyId = babyId;

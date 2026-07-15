@@ -1,7 +1,7 @@
 /**
  * 全局常量定义
  */
-import type { TaskType, TaskPriority, TemplateKey, SubscribeTemplate } from '@/types';
+import type { TaskType, TaskPriority, TemplateKey, SubscribeTemplate, FamilyRelation } from '@/types';
 
 /** 事项类型配置 */
 export const TASK_TYPE_CONFIG: Record<TaskType, {
@@ -138,9 +138,84 @@ export const CLOUD_FUNCTIONS = {
   CONFIRM: 'api-confirm',
   STATS: 'api-stats',
   SUBSCRIBE: 'api-subscribe',
+  FAMILY: 'api-family',
   CRON_SCAN: 'cron-scan',
   CRON_CLEANUP: 'cron-cleanup',
 } as const;
+
+/** 家庭成员身份配置 */
+export const FAMILY_RELATION_CONFIG: Record<FamilyRelation, {
+  name: string;
+  shortName: string;
+  uIcon: string;
+  color: string;
+  bgColor: string;
+}> = {
+  father: {
+    name: '爸爸',
+    shortName: '爸',
+    uIcon: 'man',
+    color: '#378add',
+    bgColor: '#E8F2FC',
+  },
+  mother: {
+    name: '妈妈',
+    shortName: '妈',
+    uIcon: 'woman',
+    color: '#FF7B7B',
+    bgColor: '#FFF0F0',
+  },
+  grandfather: {
+    name: '爷爷',
+    shortName: '爷',
+    uIcon: 'man',
+    color: '#7f77dd',
+    bgColor: '#F0EEFC',
+  },
+  grandmother: {
+    name: '奶奶',
+    shortName: '奶',
+    uIcon: 'woman',
+    color: '#9c27b0',
+    bgColor: '#F3E5F5',
+  },
+  grandfather_in_law: {
+    name: '外公',
+    shortName: '公',
+    uIcon: 'man',
+    color: '#1d9e75',
+    bgColor: '#E8F7F0',
+  },
+  grandmother_in_law: {
+    name: '外婆',
+    shortName: '婆',
+    uIcon: 'woman',
+    color: '#ef9f27',
+    bgColor: '#FEF5E7',
+  },
+  nanny: {
+    name: '育儿阿姨',
+    shortName: '姨',
+    uIcon: 'account-fill',
+    color: '#00bcd4',
+    bgColor: '#E0F7FA',
+  },
+  other: {
+    name: '其他',
+    shortName: '他',
+    uIcon: 'account-fill',
+    color: '#999',
+    bgColor: '#F5F5F5',
+  },
+};
+
+/** 家庭身份选项（用于选择器） */
+export const FAMILY_RELATION_OPTIONS = Object.entries(FAMILY_RELATION_CONFIG).map(([value, config]) => ({
+  value: value as FamilyRelation,
+  label: config.name,
+  uIcon: config.uIcon,
+  color: config.color,
+}));
 
 /** 事项类型选项 (用于选择器) */
 export const TASK_TYPE_OPTIONS = Object.entries(TASK_TYPE_CONFIG).map(([value, config]) => ({

@@ -67,6 +67,12 @@
               <view class="item-action-wrap">
                 <view class="action-dot" :class="item.action" />
                 <text class="item-action" :class="item.action">{{ actionText(item.action) }}</text>
+                <!-- 操作人信息（家庭协作） -->
+                <template v-if="item.operatorName">
+                  <text class="operator-sep">·</text>
+                  <text class="operator-name" :style="{ color: getOperatorColor(item.operatorRelation) }">{{ item.operatorName }}</text>
+                  <text class="operator-relation" :style="{ color: getOperatorColor(item.operatorRelation) }">{{ getOperatorRelation(item.operatorRelation) }}</text>
+                </template>
               </view>
             </view>
             <u-tag v-if="item.delayMinutes" :text="'+' + item.delayMinutes + 'min'" type="warning" size="mini" shape="circle" plain />
@@ -91,9 +97,9 @@
 import { ref, computed, onMounted } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
 import { getConfirmHistory } from '@/api/confirm';
-import { TASK_TYPE_CONFIG, TASK_TYPE_OPTIONS } from '@/utils/constants';
+import { TASK_TYPE_CONFIG, TASK_TYPE_OPTIONS, FAMILY_RELATION_CONFIG } from '@/utils/constants';
 import { formatTime, formatDate } from '@/utils/time';
-import type { ConfirmLog, TaskType, ConfirmAction } from '@/types';
+import type { ConfirmLog, TaskType, ConfirmAction, FamilyRelation } from '@/types';
 import EmptyState from '@/components/EmptyState.vue';
 
 const loading = ref(false);
@@ -185,6 +191,16 @@ function actionText(action: ConfirmAction): string {
     ignored: '已忽略',
   };
   return map[action];
+}
+
+function getOperatorColor(relation?: FamilyRelation): string {
+  if (!relation) return '#999';
+  return FAMILY_RELATION_CONFIG[relation]?.color || '#999';
+}
+
+function getOperatorRelation(relation?: FamilyRelation): string {
+  if (!relation) return '';
+  return FAMILY_RELATION_CONFIG[relation]?.shortName || '';
 }
 
 function onStartDateChange(e: any) {
@@ -408,6 +424,24 @@ function resetFilter() {
         &.completed { color: #1d9e75; }
         &.delayed { color: #ef9f27; }
         &.ignored { color: #aaa; }
+      }
+
+      .operator-sep {
+        font-size: 20rpx;
+        color: #ddd;
+        margin: 0 2rpx;
+      }
+
+      .operator-name {
+        font-size: 22rpx;
+        font-weight: 500;
+      }
+
+      .operator-relation {
+        font-size: 18rpx;
+        padding: 2rpx 8rpx;
+        border-radius: 6rpx;
+        background: rgba(0, 0, 0, 0.04);
       }
     }
   }

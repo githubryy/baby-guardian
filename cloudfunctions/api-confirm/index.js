@@ -14,13 +14,15 @@ exports.main = async (event, context) => {
       .limit(1)
       .get();
     if (users.length === 0) return fail('用户不存在');
-    const userId = users[0]._id;
+    const currentUser = users[0];
+    const userId = currentUser._id;
+    const familyId = currentUser.familyId || userId;
 
     switch (action) {
       case 'confirm':
-        return await handleConfirm(userId, event.data);
+        return await handleConfirm(userId, familyId, currentUser, event.data);
       case 'history':
-        return await handleHistory(userId, event.params);
+        return await handleHistory(userId, familyId, event.params);
       default:
         return fail(`未知操作: ${action}`);
     }
@@ -32,9 +34,9 @@ exports.main = async (event, context) => {
 
 /**
  * 确认操作
- * P1 重试策略: 首次推送用订阅消息，重试用小程序内通知(红点)
+ * V2.0: 写入操作人信息（operatorId/operatorName/operatorAvatar/operatorRelation）
  */
-async function handleConfirm(userId, data) {
+async function handleConfirm(userId, familyId, currentUser, data) {
   const { taskId, action, delayMinutes, remark } = data;
   const now = nowISO();
 
@@ -42,27 +44,36 @@ async function handleConfirm(userId, data) {
   const { data: task } = await db.collection('reminder_tasks').doc(taskId).get();
   if (!task) return fail('事项不存在');
 
-  // 写入确认日志
+  // 写入确认日志（含操作人信息）
   const log = {
     taskId,
     babyId: task.babyId,
     userId,
+    familyId,
     action,
     completedTime: now,
     delayMinutes: delayMinutes || null,
     remark: remark || null,
+    // 操作人信息
+    operatorId: userId,
+    operatorName: currentUser.nickName || '家庭成员',
+    operatorAvatar: currentUser.avatarUrl || '',
+    operatorRelation: currentUser.relation || 'other',
     createdAt: now,
   };
   const { _id: logId } = await db.collection('confirm_logs').add({ data: log });
 
   // 更新事项状态
   if (action === 'completed') {
-    // 完成: 重置重试次数，计算下次提醒时间
+    // 完成: 重置重试次数，计算下次提醒时间，记录完成者
     const nextRemind = new Date();
     nextRemind.setMinutes(nextRemind.getMinutes() + task.intervalMinutes);
     await db.collection('reminder_tasks').doc(taskId).update({
       data: {
         lastCompletedTime: now,
+        lastCompletedBy: userId,
+        lastCompletedByName: currentUser.nickName,
+        lastCompletedByRelation: currentUser.relation || 'other',
         nextRemindTime: nextRemind.toISOString(),
         retryCount: 0,
         processingLock: false,
@@ -97,11 +108,11 @@ async function handleConfirm(userId, data) {
   return success({ ...log, _id: logId });
 }
 
-/** 获取确认历史 */
-async function handleHistory(userId, params = {}) {
+/** 获取确认历史（按家庭查询） */
+async function handleHistory(userId, familyId, params = {}) {
   const { babyId, taskId, startDate, endDate, page = 1, pageSize = 20 } = params;
 
-  const query = { userId };
+  const query = { familyId };
   if (babyId) query.babyId = babyId;
   if (taskId) query.taskId = taskId;
   if (startDate || endDate) {

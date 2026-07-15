@@ -59,6 +59,25 @@
       </view>
     </view>
 
+    <!-- 家庭协作 -->
+    <view class="section slide-up" style="animation-delay: 0.15s">
+      <view class="section-title">家庭协作</view>
+      <view class="menu-list">
+        <view class="menu-item tap-shrink" @tap="goFamily">
+          <view class="menu-icon-wrap family-bg">
+            <u-icon name="home-fill" :size="22" color="#9c27b0" />
+          </view>
+          <view class="menu-text-wrap">
+            <text class="menu-text">家庭管理</text>
+            <text v-if="hasFamily" class="menu-sub-text">{{ familyName }} · {{ memberCount }}位成员</text>
+            <text v-else class="menu-sub-text">邀请家人一起照看宝宝</text>
+          </view>
+          <u-tag v-if="hasFamily" :text="`${memberCount}人`" type="primary" size="mini" shape="circle" plain />
+          <u-icon name="arrow-right" :size="16" color="#ccc" />
+        </view>
+      </view>
+    </view>
+
     <!-- 提醒设置 -->
     <view class="section slide-up" style="animation-delay: 0.18s">
       <view class="section-title">提醒设置</view>
@@ -136,10 +155,13 @@ import { computed } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
 import { storeToRefs } from 'pinia';
 import { useUserStore } from '@/stores/user';
+import { useFamilyStore } from '@/stores/family';
 import { guideBatchAuthorization } from '@/utils/subscribe';
 
 const userStore = useUserStore();
+const familyStore = useFamilyStore();
 const { nickName, avatarUrl, settings, availableQuota } = storeToRefs(userStore);
+const { hasFamily, familyName, memberCount } = storeToRefs(familyStore);
 
 const pushProxy = computed({
   get: () => settings.value.globalPushEnabled,
@@ -148,6 +170,7 @@ const pushProxy = computed({
 
 onShow(() => {
   userStore.refreshQuota();
+  familyStore.loadFamily();
 });
 
 function goBabyList() {
@@ -156,6 +179,10 @@ function goBabyList() {
 
 function goAddBaby() {
   uni.navigateTo({ url: '/pages/baby/edit' });
+}
+
+function goFamily() {
+  uni.navigateTo({ url: '/pages/family/index' });
 }
 
 async function onQuietStartChange(e: any) {
@@ -388,6 +415,7 @@ function showFeedback() {
 
       &.baby-bg { background: #fff0f0; }
       &.add-bg { background: #e8f2fc; }
+      &.family-bg { background: #f3e5f5; }
       &.push-bg { background: #fef5e7; }
       &.moon-bg { background: #e8eaf6; }
       &.sun-bg { background: #fff8e1; }
@@ -400,6 +428,23 @@ function showFeedback() {
       flex: 1;
       font-size: 30rpx;
       color: #2d2d2d;
+    }
+
+    .menu-text-wrap {
+      flex: 1;
+
+      .menu-text {
+        display: block;
+        font-size: 30rpx;
+        color: #2d2d2d;
+      }
+
+      .menu-sub-text {
+        display: block;
+        font-size: 22rpx;
+        color: #aaa;
+        margin-top: 2rpx;
+      }
     }
 
     .menu-value-wrap {

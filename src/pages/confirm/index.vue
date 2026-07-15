@@ -31,6 +31,16 @@
           </view>
           <text class="info-value">{{ lastDurationText }}</text>
         </view>
+        <view class="info-row" v-if="lastCompletedByText">
+          <view class="info-left">
+            <u-icon name="account-fill" :size="15" color="#aaa" />
+            <text class="info-label">上次完成</text>
+          </view>
+          <view class="info-value operator-info">
+            <text class="operator-name-text" :style="{ color: getRelationColor(task?.lastCompletedByRelation) }">{{ lastCompletedByText }}</text>
+            <text class="operator-relation-tag" :style="{ color: getRelationColor(task?.lastCompletedByRelation), background: getRelationColor(task?.lastCompletedByRelation) + '15' }" v-if="task?.lastCompletedByRelation">{{ getRelationShortName(task.lastCompletedByRelation) }}</text>
+          </view>
+        </view>
       </view>
     </view>
 
@@ -100,11 +110,11 @@ import { storeToRefs } from 'pinia';
 import { useTaskStore } from '@/stores/task';
 import { useBabyStore } from '@/stores/baby';
 import { useUserStore } from '@/stores/user';
-import { TASK_TYPE_CONFIG, PRIORITY_CONFIG } from '@/utils/constants';
+import { TASK_TYPE_CONFIG, PRIORITY_CONFIG, FAMILY_RELATION_CONFIG } from '@/utils/constants';
 import { formatTime, relativeTime } from '@/utils/time';
 import { guideBatchAuthorization } from '@/utils/subscribe';
 import { getTaskDetail } from '@/api/task';
-import type { ReminderTask } from '@/types';
+import type { ReminderTask, FamilyRelation } from '@/types';
 
 const taskStore = useTaskStore();
 const babyStore = useBabyStore();
@@ -166,6 +176,21 @@ const lastDurationText = computed(() => {
   if (!task.value?.lastCompletedTime) return '';
   return relativeTime(task.value.lastCompletedTime);
 });
+
+const lastCompletedByText = computed(() => {
+  if (!task.value?.lastCompletedByName) return '';
+  return task.value.lastCompletedByName;
+});
+
+function getRelationShortName(relation?: FamilyRelation): string {
+  if (!relation) return '';
+  return FAMILY_RELATION_CONFIG[relation]?.shortName || '';
+}
+
+function getRelationColor(relation?: FamilyRelation): string {
+  if (!relation) return '#999';
+  return FAMILY_RELATION_CONFIG[relation]?.color || '#999';
+}
 
 async function onComplete() {
   if (submitting.value) return;
@@ -319,6 +344,24 @@ async function onSupplementQuota() {
           color: #ff7b7b;
           font-weight: 600;
           font-size: 28rpx;
+        }
+
+        &.operator-info {
+          display: flex;
+          align-items: center;
+          gap: 8rpx;
+
+          .operator-name-text {
+            font-size: 26rpx;
+            font-weight: 500;
+          }
+
+          .operator-relation-tag {
+            font-size: 20rpx;
+            padding: 2rpx 10rpx;
+            border-radius: 6rpx;
+            font-weight: 500;
+          }
         }
       }
     }
