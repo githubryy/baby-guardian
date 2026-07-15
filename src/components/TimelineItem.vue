@@ -7,7 +7,7 @@
     </view>
 
     <!-- 内容卡片 -->
-    <view class="content-card tap-shrink" @tap="$emit('tap', item)">
+    <view class="content-card tap-shrink" @tap="$emit('item-tap', item)">
       <view class="card-header">
         <view class="type-icon" :style="{ background: item.typeColor + '18' }">
           <u-icon :name="taskUIcon" :size="26" :color="item.typeColor" />
@@ -82,7 +82,7 @@ const props = defineProps<{
 }>();
 
 defineEmits<{
-  (e: 'tap', item: TimelineItem): void;
+  (e: 'item-tap', item: TimelineItem): void;
   (e: 'complete', item: TimelineItem): void;
   (e: 'delay', item: TimelineItem): void;
   (e: 'ignore', item: TimelineItem): void;

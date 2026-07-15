@@ -134,12 +134,14 @@ onLoad((options) => {
 
 async function loadTask() {
   try {
+    console.log('taskStore.taskList', taskStore.taskList)
     const localTask = taskStore.taskList.find((t) => t._id === taskId.value);
     if (localTask) {
       task.value = localTask;
     } else {
       task.value = await getTaskDetail(taskId.value);
     }
+    console.log('task.value', task.value)
   } catch (err) {
     console.error('[加载事项详情失败]', err);
   }

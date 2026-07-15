@@ -64,6 +64,7 @@ export function requestSubscribeAuthorization(
  * 记录订阅授权到云函数 (写入配额)
  */
 export function recordSubscriptionQuota(acceptedTemplates: TemplateKey[]): Promise<void> {
+  console.log('acceptedTemplates', acceptedTemplates)
   return callCloud(CLOUD_FUNCTIONS.SUBSCRIBE, {
     action: 'recordQuota',
     templates: acceptedTemplates,

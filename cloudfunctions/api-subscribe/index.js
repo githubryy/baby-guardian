@@ -148,10 +148,20 @@ async function handleRecordQuota(openId, templates) {
   }));
 
   const results = await Promise.all(
-    quotas.map((q) => db.collection('subscription_quotas').add({ data: q }))
+    quotas.map((q) =>
+      db.collection('subscription_quotas').add({ data: q }).catch((err) => {
+        // 重复授权不视为错误：同一用户在相近时间授权相同模板会导致唯一索引冲突
+        if (err.errCode === 'DATABASE_REQUEST_FAILED' || (err.message && err.message.includes('E11000'))) {
+          console.log('[配额记录] 跳过重复记录:', q.templateKey);
+          return null;
+        }
+        throw err;
+      })
+    )
   );
 
-  return success({ created: results.length });
+  const created = results.filter(Boolean).length;
+  return success({ created });
 }
 
 /** 获取配额汇总 */

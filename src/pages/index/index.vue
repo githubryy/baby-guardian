@@ -89,7 +89,7 @@
             <view class="section-list slide-up-stagger">
               <TimelineItemComp v-for="item in pendingItems" :key="item.taskId" :item="item"
                 @complete="handleComplete" @delay="handleDelay" @ignore="handleIgnore"
-                @tap="goTaskDetail" />
+                @item-tap="goTaskDetail" />
             </view>
           </view>
 
@@ -105,7 +105,7 @@
             <view class="section-list slide-up-stagger">
               <TimelineItemComp v-for="item in overdueItems" :key="item.taskId" :item="item"
                 @complete="handleComplete" @delay="handleDelay" @ignore="handleIgnore"
-                @tap="goTaskDetail" />
+                @item-tap="goTaskDetail" />
             </view>
           </view>
 
@@ -120,7 +120,7 @@
             </view>
             <view class="section-list slide-up-stagger">
               <TimelineItemComp v-for="item in completedItems" :key="item.taskId" :item="item"
-                @tap="goTaskDetail" />
+                @item-tap="goTaskDetail" />
             </view>
           </view>
 
