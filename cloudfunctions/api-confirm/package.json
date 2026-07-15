@@ -1,0 +1,9 @@
+{
+  "name": "api-confirm",
+  "version": "1.0.0",
+  "description": "确认完成/延迟/忽略 + 历史查询",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

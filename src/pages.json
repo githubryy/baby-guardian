@@ -1,0 +1,107 @@
+{
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^u--(.*)": "uview-plus/components/u-$1/u-$1.vue",
+      "^up-(.*)": "uview-plus/components/u-$1/u-$1.vue",
+      "^u-([^-].*)": "uview-plus/components/u-$1/u-$1.vue"
+    }
+  },
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "宝宝守护者",
+        "enablePullDownRefresh": true,
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/baby/list",
+      "style": {
+        "navigationBarTitleText": "我的宝宝"
+      }
+    },
+    {
+      "path": "pages/baby/edit",
+      "style": {
+        "navigationBarTitleText": "宝宝信息"
+      }
+    },
+    {
+      "path": "pages/task/list",
+      "style": {
+        "navigationBarTitleText": "提醒事项"
+      }
+    },
+    {
+      "path": "pages/task/edit",
+      "style": {
+        "navigationBarTitleText": "事项配置"
+      }
+    },
+    {
+      "path": "pages/confirm/index",
+      "style": {
+        "navigationBarTitleText": "确认提醒"
+      }
+    },
+    {
+      "path": "pages/stats/index",
+      "style": {
+        "navigationBarTitleText": "统计"
+      }
+    },
+    {
+      "path": "pages/history/index",
+      "style": {
+        "navigationBarTitleText": "历史记录"
+      }
+    },
+    {
+      "path": "pages/settings/index",
+      "style": {
+        "navigationBarTitleText": "设置"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "宝宝守护者",
+    "navigationBarBackgroundColor": "#FF7B7B",
+    "backgroundColor": "#F8F8F8",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#FF7B7B",
+    "borderStyle": "white",
+    "backgroundColor": "#FFFFFF",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "static/icons/home.png",
+        "selectedIconPath": "static/icons/home-active.png"
+      },
+      {
+        "pagePath": "pages/stats/index",
+        "text": "统计",
+        "iconPath": "static/icons/stats.png",
+        "selectedIconPath": "static/icons/stats-active.png"
+      },
+      {
+        "pagePath": "pages/history/index",
+        "text": "记录",
+        "iconPath": "static/icons/history.png",
+        "selectedIconPath": "static/icons/history-active.png"
+      },
+      {
+        "pagePath": "pages/settings/index",
+        "text": "我的",
+        "iconPath": "static/icons/settings.png",
+        "selectedIconPath": "static/icons/settings-active.png"
+      }
+    ]
+  }
+}

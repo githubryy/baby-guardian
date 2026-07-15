@@ -1,0 +1,9 @@
+{
+  "name": "shared",
+  "version": "1.0.0",
+  "description": "云函数公共工具",
+  "main": "utils.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

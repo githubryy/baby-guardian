@@ -1,0 +1,9 @@
+{
+  "name": "api-subscribe",
+  "version": "1.0.0",
+  "description": "用户登录 + 订阅配额管理",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

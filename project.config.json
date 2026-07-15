@@ -1,0 +1,24 @@
+{
+  "miniprogramRoot": "./dist/dev/mp-weixin",
+  "cloudfunctionRoot": "./cloudfunctions",
+  "projectname": "baby-guardian",
+  "description": "宝宝守护者 - 育儿提醒微信小程序",
+  "appid": "",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "minified": true,
+    "postcss": true,
+    "minifyWXML": true,
+    "newFeature": true,
+    "bigPackageSizeSupport": true
+  },
+  "compileType": "miniprogram",
+  "libVersion": "3.5.5",
+  "condition": {},
+  "editorSetting": {
+    "tabIndent": "insertSpaces",
+    "tabSize": 2
+  }
+}

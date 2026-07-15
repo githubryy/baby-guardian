@@ -1,0 +1,295 @@
+<template>
+  <view class="timeline-item" :class="item.status">
+    <!-- 时间线连接线 -->
+    <view class="timeline-line">
+      <view class="time-dot" :style="{ background: dotColor }" />
+      <view class="line-connector" />
+    </view>
+
+    <!-- 内容卡片 -->
+    <view class="content-card tap-shrink" @tap="$emit('tap', item)">
+      <view class="card-header">
+        <view class="type-icon" :style="{ background: item.typeColor + '18' }">
+          <u-icon :name="taskUIcon" :size="26" :color="item.typeColor" />
+        </view>
+        <view class="header-info">
+          <text class="type-name">{{ item.typeName }}</text>
+          <text v-if="item.customName" class="custom-name">{{ item.customName }}</text>
+        </view>
+        <u-tag v-if="statusTag" :text="statusTag" :type="statusTagType" size="mini" shape="circle" />
+      </view>
+
+      <view class="card-body">
+        <view class="body-row">
+          <view class="baby-info">
+            <u-icon name="account-fill" :size="13" color="#aaa" />
+            <text class="baby-name">{{ item.babyName }}</text>
+            <text v-if="item.lastDurationText" class="duration">
+              · 距上次 {{ item.lastDurationText }}
+            </text>
+          </view>
+          <view class="time-wrap">
+            <u-icon name="clock" :size="13" color="#bbb" />
+            <text class="time-text">{{ timeText }}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 操作按钮 -->
+      <view v-if="item.status === 'pending' || item.status === 'overdue'" class="card-actions">
+        <view class="action-btn complete tap-feedback" @tap.stop="$emit('complete', item)">
+          <u-icon name="checkmark-circle-fill" :size="16" color="#fff" />
+          <text class="action-label">完成</text>
+        </view>
+        <view class="action-btn delay tap-feedback" @tap.stop="$emit('delay', item)">
+          <u-icon name="clock-fill" :size="16" color="#d88e1a" />
+          <text class="action-label">延迟</text>
+        </view>
+        <view class="action-btn ignore tap-feedback" @tap.stop="$emit('ignore', item)">
+          <u-icon name="close-circle-fill" :size="16" color="#aaa" />
+          <text class="action-label">忽略</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue';
+import type { TimelineItem } from '@/types';
+import { formatTime } from '@/utils/time';
+import { TASK_TYPE_CONFIG } from '@/utils/constants';
+
+const props = defineProps<{
+  item: TimelineItem;
+}>();
+
+defineEmits<{
+  (e: 'tap', item: TimelineItem): void;
+  (e: 'complete', item: TimelineItem): void;
+  (e: 'delay', item: TimelineItem): void;
+  (e: 'ignore', item: TimelineItem): void;
+}>();
+
+const timeText = computed(() => formatTime(props.item.remindTime));
+
+const taskUIcon = computed(() => {
+  return TASK_TYPE_CONFIG[props.item.type]?.uIcon || 'edit-pen';
+});
+
+const statusTag = computed(() => {
+  const map = {
+    pending: '',
+    completed: '已完成',
+    delayed: '已延迟',
+    overdue: '已超时',
+  };
+  return map[props.item.status];
+});
+
+const statusTagType = computed<'success' | 'warning' | 'error'>(() => {
+  const map = {
+    completed: 'success' as const,
+    delayed: 'warning' as const,
+    overdue: 'error' as const,
+    pending: 'success' as const,
+  };
+  return map[props.item.status];
+});
+
+const dotColor = computed(() => {
+  if (props.item.status === 'overdue') return '#e24b4a';
+  if (props.item.status === 'completed') return '#1d9e75';
+  if (props.item.status === 'delayed') return '#ef9f27';
+  return props.item.typeColor;
+});
+</script>
+
+<style lang="scss" scoped>
+.timeline-item {
+  display: flex;
+  margin-bottom: 20rpx;
+
+  .timeline-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 48rpx;
+    flex-shrink: 0;
+
+    .time-dot {
+      width: 20rpx;
+      height: 20rpx;
+      border-radius: 50%;
+      margin-top: 30rpx;
+      box-shadow: 0 0 0 6rpx rgba(255, 255, 255, 1);
+      flex-shrink: 0;
+      z-index: 1;
+    }
+
+    .line-connector {
+      flex: 1;
+      width: 2rpx;
+      background: #e8e8e8;
+      margin-top: 2rpx;
+      min-height: 20rpx;
+    }
+  }
+
+  &:last-child {
+    .line-connector {
+      display: none;
+    }
+  }
+
+  .content-card {
+    flex: 1;
+    background: #fff;
+    border-radius: 20rpx;
+    padding: 24rpx;
+    margin-bottom: 0;
+    box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.05);
+    border: 1rpx solid #f5f5f5;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 16rpx;
+    margin-bottom: 14rpx;
+
+    .type-icon {
+      width: 68rpx;
+      height: 68rpx;
+      border-radius: 18rpx;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .header-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+
+      .type-name {
+        font-size: 30rpx;
+        font-weight: 600;
+        color: #2d2d2d;
+      }
+
+      .custom-name {
+        font-size: 22rpx;
+        color: #aaa;
+        margin-top: 2rpx;
+      }
+    }
+  }
+
+  .card-body {
+    .body-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      .baby-info {
+        display: flex;
+        align-items: center;
+        gap: 4rpx;
+
+        .baby-name {
+          font-size: 26rpx;
+          color: #888;
+        }
+
+        .duration {
+          font-size: 24rpx;
+          color: #bbb;
+        }
+      }
+
+      .time-wrap {
+        display: flex;
+        align-items: center;
+        gap: 4rpx;
+
+        .time-text {
+          font-size: 26rpx;
+          color: #999;
+          font-weight: 500;
+          font-variant-numeric: tabular-nums;
+        }
+      }
+    }
+  }
+
+  .card-actions {
+    display: flex;
+    gap: 12rpx;
+    margin-top: 20rpx;
+    padding-top: 20rpx;
+    border-top: 1rpx solid #f0f0f0;
+
+    .action-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6rpx;
+      padding: 14rpx 0;
+      border-radius: 14rpx;
+      font-size: 26rpx;
+      font-weight: 500;
+
+      .action-label {
+        font-size: 26rpx;
+      }
+
+      &.complete {
+        background: linear-gradient(135deg, #1d9e75, #28b886);
+        color: #fff;
+        box-shadow: 0 4rpx 12rpx rgba(29, 158, 117, 0.3);
+
+        .action-label {
+          color: #fff;
+        }
+      }
+
+      &.delay {
+        background: #fef5e7;
+        color: #d88e1a;
+      }
+
+      &.ignore {
+        background: #f5f5f5;
+        color: #aaa;
+      }
+    }
+  }
+
+  /* 状态样式 */
+  &.completed {
+    .content-card {
+      opacity: 0.6;
+    }
+  }
+
+  &.overdue {
+    .content-card {
+      border-left: 6rpx solid #e24b4a;
+    }
+
+    .time-dot {
+      box-shadow: 0 0 0 6rpx rgba(226, 75, 74, 0.15);
+    }
+  }
+
+  &.delayed {
+    .content-card {
+      border-left: 6rpx solid #ef9f27;
+    }
+  }
+}
+</style>

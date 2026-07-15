@@ -1,0 +1,27 @@
+{
+  "name": "宝宝守护者",
+  "appid": "",
+  "description": "育儿提醒助手，守护宝宝每一天",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": false,
+      "es6": true,
+      "minified": true,
+      "postcss": true
+    },
+    "usingComponents": true,
+    "permission": {
+      "scope.userInfo": {
+        "desc": "用于个性化展示用户信息"
+      }
+    },
+    "cloudfunctionRoot": "cloudfunctions/",
+    "requiredPrivateInfos": ["chooseLocation"],
+    "lazyCodeLoading": "requiredComponents"
+  },
+  "vueVersion": "3"
+}

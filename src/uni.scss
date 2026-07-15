@@ -1,0 +1,88 @@
+/* uview-plus 主题变量（仅引入变量定义，不含 CSS 规则，避免包体积膨胀） */
+@import 'uview-plus/theme.scss';
+
+/* 覆盖 uView 主色调为宝宝守护者品牌色 */
+$u-primary: #FF7B7B;
+$u-primary-light: #FFB3B3;
+$u-primary-dark: #E55C5C;
+$u-primary-disabled: #FFD0D0;
+$u-primary-light-9: #FFF0F0;
+
+$u-success: #1d9e75;
+$u-warning: #ef9f27;
+$u-error: #e24b4a;
+$u-info: #378add;
+
+/* ========== 项目自定义变量 ========== */
+
+/* 主题色 */
+$primary: #FF7B7B;
+$primary-light: #FFB3B3;
+$primary-dark: #E55C5C;
+$primary-bg: #FFF0F0;
+
+/* 功能色 */
+$success: #1d9e75;
+$success-bg: #E8F7F0;
+$warning: #ef9f27;
+$warning-bg: #FEF5E7;
+$danger: #e24b4a;
+$danger-bg: #FDEAEA;
+$info: #378add;
+$info-bg: #E8F2FC;
+
+/* 中性色 */
+$text-primary: #2D2D2D;
+$text-secondary: #666666;
+$text-placeholder: #AAAAAA;
+$text-disabled: #CCCCCC;
+$border-color: #E8E8E8;
+$divider: #F0F0F0;
+$bg-page: #F8F8F8;
+$bg-card: #FFFFFF;
+$bg-gray: #F5F5F5;
+
+/* 圆角 */
+$radius-sm: 8rpx;
+$radius-md: 16rpx;
+$radius-lg: 24rpx;
+$radius-xl: 32rpx;
+$radius-full: 999rpx;
+
+/* 间距 */
+$space-xs: 8rpx;
+$space-sm: 16rpx;
+$space-md: 24rpx;
+$space-lg: 32rpx;
+$space-xl: 48rpx;
+
+/* 字号 */
+$font-xs: 20rpx;
+$font-sm: 24rpx;
+$font-md: 28rpx;
+$font-lg: 32rpx;
+$font-xl: 36rpx;
+$font-xxl: 44rpx;
+
+/* 阴影 */
+$shadow-sm: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+$shadow-md: 0 4rpx 16rpx rgba(0, 0, 0, 0.08);
+$shadow-lg: 0 8rpx 32rpx rgba(0, 0, 0, 0.12);
+$shadow-primary: 0 8rpx 24rpx rgba(255, 123, 123, 0.3);
+$shadow-primary-lg: 0 12rpx 32rpx rgba(255, 123, 123, 0.4);
+
+/* 过渡 */
+$transition-fast: all 0.15s ease;
+$transition-base: all 0.25s ease;
+$transition-slow: all 0.4s ease;
+
+/* z-index 层级 */
+$z-dropdown: 100;
+$z-sticky: 200;
+$z-fixed: 300;
+$z-modal: 400;
+$z-toast: 500;
+
+/* 动画 */
+$bounce-in: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+$ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
