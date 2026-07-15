@@ -7,7 +7,7 @@ onLaunch(() => {
   // 初始化云开发
   if (wx.cloud) {
     wx.cloud.init({
-      env: 'baby-guardian-prod',
+      env: 'cloudbase-d8g1n7nag24fc86c3',
       traceUser: true,
     });
   }

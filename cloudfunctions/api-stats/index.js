@@ -2,7 +2,7 @@
  * api-stats 云函数
  * 统计查询: 概览、日统计、类型统计
  */
-const { cloud, db, _, success, fail, getOpenId } = require('../shared/utils');
+const { cloud, db, _, success, fail, getOpenId } = require('./utils');
 
 const TASK_TYPE_NAMES = {
   feeding: '喂养',

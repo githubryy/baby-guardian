@@ -2,7 +2,7 @@
  * api-confirm 云函数
  * 确认完成/延迟/忽略 + 历史记录查询
  */
-const { cloud, db, _, success, fail, getOpenId, nowISO } = require('../shared/utils');
+const { cloud, db, _, success, fail, getOpenId, nowISO } = require('./utils');
 
 exports.main = async (event, context) => {
   const { action } = event;

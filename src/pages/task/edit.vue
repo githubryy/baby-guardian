@@ -10,7 +10,7 @@
             :style="form.type === opt.value ? { borderColor: opt.color, background: opt.color + '10' } : {}"
             @tap="onSelectType(opt.value)">
             <view class="type-icon-box" :style="{ background: opt.color + '15' }">
-              <u-icon :name="opt.uIcon" :size="28" :color="opt.color" />
+              <u-icon :name="opt.icon" :size="16" :color="opt.color" />
             </view>
             <text class="type-name" :style="{ color: form.type === opt.value ? opt.color : '#666' }">
               {{ opt.label }}
@@ -22,8 +22,8 @@
       <!-- 自定义名称 -->
       <view v-if="form.type === 'custom'" class="form-item">
         <text class="form-label">事项名称</text>
-        <u-input v-model="form.customName" placeholder="如：抚触按摩、排气操" border="surround"
-          :customStyle="{ height: '80rpx' }" maxlength="20" />
+        <u-input v-model="form.customName" placeholder="如：抚触按摩、排气操" border="surround" :customStyle="{ height: '80rpx' }"
+          maxlength="20" />
       </view>
 
       <!-- 优先级 -->
@@ -62,8 +62,7 @@
         <text class="form-label">提醒间隔</text>
         <view class="interval-presets">
           <view v-for="preset in intervalPresets" :key="preset.value" class="preset-option"
-            :class="{ active: form.intervalMinutes === preset.value }"
-            @tap="form.intervalMinutes = preset.value">
+            :class="{ active: form.intervalMinutes === preset.value }" @tap="form.intervalMinutes = preset.value">
             <text>{{ preset.label }}</text>
           </view>
         </view>
@@ -72,7 +71,7 @@
           <u-input v-model="customIntervalStr" type="number" placeholder="分钟" border="surround"
             :customStyle="{ flex: '1', textAlign: 'center' }" @confirm="applyCustomInterval" />
           <text class="interval-unit">分钟</text>
-          <u-button text="应用" size="mini" type="error" @click="applyCustomInterval" />
+          <u-button class="custom-style" text="应用" size="mini" type="error" @click="applyCustomInterval" />
         </view>
       </view>
 
@@ -87,8 +86,7 @@
             </view>
           </picker>
           <text class="window-separator">至</text>
-          <picker mode="time" :value="form.reminderWindowEnd"
-            @change="form.reminderWindowEnd = $event.detail.value">
+          <picker mode="time" :value="form.reminderWindowEnd" @change="form.reminderWindowEnd = $event.detail.value">
             <view class="window-picker">
               <text>{{ form.reminderWindowEnd }}</text>
             </view>
@@ -104,18 +102,18 @@
       <view class="form-item">
         <text class="form-label">窗口外处理策略</text>
         <view class="strategy-row">
-          <view class="strategy-option"
-            :class="{ active: form.windowSkipStrategy === 'delay_to_next_window' }"
+          <view class="strategy-option" :class="{ active: form.windowSkipStrategy === 'delay_to_next_window' }"
             @tap="form.windowSkipStrategy = 'delay_to_next_window'">
-            <u-icon v-if="form.windowSkipStrategy === 'delay_to_next_window'" name="checkmark-circle-fill" :size="16" color="#FF7B7B" />
-            <u-icon v-else name="radio-button-unchecked" :size="16" color="#ccc" />
+            <u-icon v-if="form.windowSkipStrategy === 'delay_to_next_window'" name="checkmark-circle-fill" :size="16"
+              color="#FF7B7B" />
+            <u-icon v-else name="checkmark-circle" :size="16" color="#ccc" />
             <text>推迟到下个窗口</text>
           </view>
-          <view class="strategy-option"
-            :class="{ active: form.windowSkipStrategy === 'skip_and_continue' }"
+          <view class="strategy-option" :class="{ active: form.windowSkipStrategy === 'skip_and_continue' }"
             @tap="form.windowSkipStrategy = 'skip_and_continue'">
-            <u-icon v-if="form.windowSkipStrategy === 'skip_and_continue'" name="checkmark-circle-fill" :size="16" color="#FF7B7B" />
-            <u-icon v-else name="radio-button-unchecked" :size="16" color="#ccc" />
+            <u-icon v-if="form.windowSkipStrategy === 'skip_and_continue'" name="checkmark-circle-fill" :size="16"
+              color="#FF7B7B" />
+            <u-icon v-else name="checkmark-circle" :size="16" color="#ccc" />
             <text>跳过并继续</text>
           </view>
         </view>
@@ -124,13 +122,11 @@
 
     <!-- 操作按钮 -->
     <view class="action-area">
-      <u-button :text="isEdit ? '保存修改' : '添加事项'" type="error" shape="circle"
-        :loading="saving" :disabled="saving"
+      <u-button :text="isEdit ? '保存修改' : '添加事项'" type="error" shape="circle" :loading="saving" :disabled="saving"
         :customStyle="{ height: '88rpx', fontSize: '32rpx', fontWeight: '600', marginBottom: '16rpx', background: saving ? '' : 'linear-gradient(135deg, #FF7B7B, #FF6464)', boxShadow: saving ? 'none' : '0 8rpx 24rpx rgba(255, 123, 123, 0.35)' }"
         @click="onSave" />
       <u-button v-if="isEdit" text="删除事项" shape="circle" plain type="error"
-        :customStyle="{ height: '88rpx', fontSize: '30rpx', background: '#FDEAEA' }"
-        @click="onDelete" />
+        :customStyle="{ height: '88rpx', fontSize: '30rpx', background: '#FDEAEA' }" @click="onDelete" />
     </view>
   </view>
 </template>
@@ -420,10 +416,10 @@ async function onDelete() {
 }
 
 .custom-interval {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 2fr;
   align-items: center;
-  gap: 12rpx;
-  padding: 16rpx;
+  gap: 15px;
   background: #f9f9f9;
   border-radius: 12rpx;
 

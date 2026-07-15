@@ -2,7 +2,7 @@
  * api-subscribe 云函数
  * 用户登录、用户信息管理、订阅配额管理
  */
-const { cloud, db, _, success, fail, getOpenId, nowISO } = require('../shared/utils');
+const { cloud, db, _, success, fail, getOpenId, nowISO } = require('./utils');
 
 // 订阅消息模板配置
 const TEMPLATES = {

@@ -5,7 +5,7 @@
  * 2. 解锁超时锁 (超过5分钟未释放)
  * 3. 清理过老的推送日志 (保留30天)
  */
-const { cloud, db, _, success, fail, nowISO } = require('../shared/utils');
+const { cloud, db, _, success, fail, nowISO } = require('./utils');
 
 const QUOTA_EXPIRE_DAYS = 7;
 const LOCK_TIMEOUT_MINUTES = 5;

@@ -2,7 +2,7 @@
  * api-baby 云函数
  * 宝宝 CRUD 操作
  */
-const { cloud, db, _, success, fail, getOpenId, nowISO } = require('../shared/utils');
+const { cloud, db, _, success, fail, getOpenId, nowISO } = require('./utils');
 
 exports.main = async (event, context) => {
   const { action } = event;

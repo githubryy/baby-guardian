@@ -2,7 +2,7 @@
  * api-task 云函数
  * 提醒事项 CRUD + 首页时间线
  */
-const { cloud, db, _, success, fail, getOpenId, nowISO, beijingTimeToDate, isWithinWindow } = require('../shared/utils');
+const { cloud, db, _, success, fail, getOpenId, nowISO, beijingTimeToDate, isWithinWindow } = require('./utils');
 
 // 事项类型配置
 const TASK_TYPE_CONFIG = {

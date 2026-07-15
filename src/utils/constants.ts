@@ -107,19 +107,19 @@ export const PRIORITY_CONFIG: Record<TaskPriority, {
 export const SUBSCRIBE_TEMPLATES: SubscribeTemplate[] = [
   {
     key: 'feeding',
-    templateId: '', // 替换为实际模板ID
+    templateId: 'cJTFLqrWfBPcHGmBsMiVp86CZ5Tf4Gl9oAHIWKtcLaQ', // 替换为实际模板ID
     title: '喂养提醒',
     applicableTypes: ['feeding'],
   },
   {
     key: 'care',
-    templateId: '', // 替换为实际模板ID
+    templateId: 'WvNgDqkdCzyJuTeirnpFjNDX3oVYJ7wLmGuK8hJbVu4', // 替换为实际模板ID
     title: '护理提醒',
     applicableTypes: ['diaper', 'sleep'],
   },
   {
     key: 'medicine',
-    templateId: '', // 替换为实际模板ID
+    templateId: 'cJTFLqrWfBPcHGmBsMiVp86CZ5Tf4Gl9oAHIWKtcLaQ', // 替换为实际模板ID
     title: '用药提醒',
     applicableTypes: ['vitamin', 'medicine'],
   },

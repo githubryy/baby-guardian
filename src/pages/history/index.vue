@@ -5,7 +5,7 @@
       <picker mode="date" :value="filterStartDate" fields="day" @change="onStartDateChange">
         <view class="date-picker tap-shrink">
           <text class="date-label">开始</text>
-          <text class="date-value">{{ filterStartDate || '全部' }}</text>
+          <text class="date-value">{{ filterStartDate || '选择日期' }}</text>
         </view>
       </picker>
       <text class="date-separator">~</text>
@@ -216,7 +216,7 @@ function resetFilter() {
 .filter-bar {
   display: flex;
   align-items: center;
-  gap: 12rpx;
+  gap: 60rpx;
   background: #fff;
   border-radius: 16rpx;
   padding: 16rpx 24rpx;

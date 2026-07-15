@@ -7,7 +7,7 @@
  * P1: 重试策略 — 首次用订阅消息, 重试用小程序内通知(红点)
  * P2: 优先级分层 — P0/P1 用订阅消息, P2 仅红点
  */
-const { cloud, db, _, success, fail, nowISO, isWithinWindow, getNextWindowStart } = require('../shared/utils');
+const { cloud, db, _, success, fail, nowISO, isWithinWindow, getNextWindowStart } = require('./utils');
 
 const BATCH_LIMIT = 50;
 const LOCK_TIMEOUT_MINUTES = 5;

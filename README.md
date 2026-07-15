@@ -192,17 +192,212 @@ $u-info: #378add;
 | 分层提醒 | P0/P1用订阅消息，P2用小程序内通知 |
 | 时区处理 | UTC存储 + 云函数内北京时间转换 |
 
-## 数据模型 (7 张表)
+## 数据库集合与索引
 
-| 集合 | 用途 | 关键字段 |
-|------|------|---------|
-| `users` | 用户信息 + 设置 | openId, settings, familyId |
-| `babies` | 宝宝信息 | userId, gender, birthday, isPremature |
-| `reminder_tasks` | 提醒事项配置 | babyId, type, intervalMinutes, nextRemindTime, priority |
-| `confirm_logs` | 确认操作记录 | taskId, action, completedTime |
-| `subscription_quotas` | 订阅配额管理 | openId, templateId, status, expireAt |
-| `notification_logs` | 推送日志 | taskId, sendStatus, retryRound |
-| `families` | 家庭表 (v2预留) | ownerUserId, members |
+云开发数据库共需创建 **7 个集合**。在微信开发者工具 → 云开发控制台 → 数据库 → 点击 **+** 依次创建。
+
+所有集合权限统一设为 **仅创建者可读写**（云函数通过管理端 SDK 操作，不受前端权限限制）。
+
+---
+
+### 1. `users` — 用户表
+
+用户首次登录时自动创建，每个微信用户一条记录。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `_id` | string | 文档主键（自动生成） |
+| `openId` | string | 微信 openId，用户唯一标识 |
+| `unionId` | string | 微信 unionId（可选） |
+| `nickName` | string | 昵称 |
+| `avatarUrl` | string | 头像 URL |
+| `settings` | object | 用户设置对象 |
+| `settings.globalPushEnabled` | boolean | 全局推送开关，默认 `true` |
+| `settings.quietHoursStart` | string | 免打扰开始时间，如 `"22:00"` |
+| `settings.quietHoursEnd` | string | 免打扰结束时间，如 `"07:00"` |
+| `familyId` | string | 家庭 ID（v1.0 默认 = 用户自身 ID） |
+| `createdAt` | string | 创建时间，ISO 8601 UTC |
+| `updatedAt` | string | 更新时间，ISO 8601 UTC |
+
+**索引：**
+
+| 索引名 | 字段 | 类型 | 用途 |
+|--------|------|------|------|
+| `idx_openId` | `openId` | 单字段 | 通过 openId 查用户 |
+
+---
+
+### 2. `babies` — 宝宝表
+
+一个用户可管理多个宝宝，每次添加宝宝时创建一条。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `_id` | string | 文档主键 |
+| `userId` | string | 所属用户 ID（关联 `users._id`） |
+| `name` | string | 宝宝昵称 |
+| `avatarUrl` | string | 宝宝头像 URL（可选） |
+| `gender` | string | `"male"` / `"female"` / `"unknown"` |
+| `birthday` | string | 出生日期，ISO 8601 |
+| `isPremature` | boolean | 是否早产儿 |
+| `dueDate` | string | 预产期（早产儿用，可选） |
+| `remark` | string | 备注（可选） |
+| `isActive` | boolean | 是否当前选中的宝宝 |
+| `createdAt` | string | 创建时间 |
+| `updatedAt` | string | 更新时间 |
+
+**索引：**
+
+| 索引名 | 字段 | 类型 | 用途 |
+|--------|------|------|------|
+| `idx_userId` | `userId` | 单字段 | 查某用户下所有宝宝 |
+
+---
+
+### 3. `reminder_tasks` — 提醒事项表（核心）
+
+最核心的集合，每条记录代表一个周期性提醒事项（如"每 3 小时喂一次奶"）。`cron-scan` 每分钟扫描此表。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `_id` | string | 文档主键 |
+| `babyId` | string | 关联宝宝 ID（关联 `babies._id`） |
+| `userId` | string | 关联用户 ID |
+| `type` | string | `"feeding"` / `"diaper"` / `"sleep"` / `"vitamin"` / `"medicine"` / `"custom"` |
+| `customName` | string | 自定义名称（type=custom 时使用） |
+| `enabled` | boolean | 是否启用 |
+| `firstTime` | string | 首次提醒时间，如 `"08:00"` |
+| `intervalMinutes` | number | 间隔分钟数，如 180 = 3 小时 |
+| `nextRemindTime` | string | **下次提醒时间**，ISO 8601 UTC（cron-scan 按此字段扫描） |
+| `lastCompletedTime` | string | 上次完成时间（可选） |
+| `reminderWindowStart` | string | 提醒窗口开始，如 `"08:00"` |
+| `reminderWindowEnd` | string | 提醒窗口结束，如 `"22:00"` |
+| `windowSkipStrategy` | string | `"delay_to_next_window"` / `"skip_and_continue"` |
+| `retryCount` | number | 重试次数（>0 时降级为红点通知） |
+| `processingLock` | boolean | 乐观锁，防止 cron 重复处理 |
+| `lockedAt` | string | 锁定时间（可选） |
+| `priority` | string | `"p0"` / `"p1"` / `"p2"`（决定推送策略） |
+| `createdAt` | string | 创建时间 |
+
+**索引（直接影响 cron-scan 性能，务必创建）：**
+
+| 索引名 | 字段 | 类型 | 用途 |
+|--------|------|------|------|
+| `idx_nextRemindTime_enabled` | `nextRemindTime` + `enabled` | 复合索引 | cron 每分钟查询 `enabled=true && nextRemindTime <= now` |
+| `idx_babyId` | `babyId` | 单字段 | 查某宝宝的所有事项 |
+| `idx_userId_enabled` | `userId` + `enabled` | 复合索引 | 查某用户的启用事项 |
+
+---
+
+### 4. `confirm_logs` — 确认日志表
+
+用户在确认页操作（完成/延迟/忽略）时写入一条记录。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `_id` | string | 文档主键 |
+| `taskId` | string | 关联事项 ID（关联 `reminder_tasks._id`） |
+| `babyId` | string | 关联宝宝 ID |
+| `userId` | string | 关联用户 ID |
+| `action` | string | `"completed"` / `"delayed"` / `"ignored"` |
+| `completedTime` | string | 实际完成时间 |
+| `delayMinutes` | number | 延迟分钟数（action=delayed 时） |
+| `remark` | string | 备注（可选） |
+| `createdAt` | string | 创建时间 |
+
+**索引：**
+
+| 索引名 | 字段 | 类型 | 用途 |
+|--------|------|------|------|
+| `idx_babyId_completedTime` | `babyId` + `completedTime` | 复合索引 | 统计页查某宝宝的历史记录 |
+
+---
+
+### 5. `subscription_quotas` — 订阅配额表
+
+微信一次性订阅消息每次用户授权 = 1 条配额，7 天有效。`cron-scan` 发推送前检查配额，发送后消耗配额。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `_id` | string | 文档主键 |
+| `openId` | string | 用户 openId |
+| `templateId` | string | 订阅消息模板 ID |
+| `status` | string | `"available"` / `"consumed"` / `"expired"` |
+| `authorizedAt` | string | 授权时间 |
+| `expireAt` | string | 过期时间（授权后 7 天） |
+| `consumedAt` | string | 消耗时间（可选） |
+| `consumedByTaskId` | string | 消耗该配额的事项 ID（可选） |
+| `notificationLogId` | string | 关联的推送日志 ID（可选） |
+
+**索引：**
+
+| 索引名 | 字段 | 类型 | 用途 |
+|--------|------|------|------|
+| `idx_openId_status_expireAt` | `openId` + `status` + `expireAt` | 复合索引 | cron-scan 查可用配额：`status=available && expireAt > now` |
+
+---
+
+### 6. `notification_logs` — 推送日志表
+
+每次 `cron-scan` 发送订阅消息（或红点通知）都写一条日志。`cron-cleanup` 每天清理 30 天前的记录。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `_id` | string | 文档主键 |
+| `taskId` | string | 关联事项 ID |
+| `babyId` | string | 关联宝宝 ID |
+| `openId` | string | 用户 openId |
+| `templateId` | string | 使用的模板 ID |
+| `quotaId` | string | 消耗的配额 ID（可选） |
+| `sendStatus` | string | `"success"` / `"failed"` / `"quota_exhausted"` |
+| `errorCode` | string | 错误码（可选） |
+| `errorMessage` | string | 错误信息（可选） |
+| `sendTime` | string | 发送时间 |
+| `retryRound` | number | 重试轮次：0=首次，1=重试1，2=重试2 |
+
+**索引：**
+
+| 索引名 | 字段 | 类型 | 用途 |
+|--------|------|------|------|
+| `idx_taskId_sendTime` | `taskId` + `sendTime` | 复合索引 | 查某事项的推送历史 |
+
+---
+
+### 7. `families` — 家庭表（v2.0 预留）
+
+v1.0 暂不使用，v2.0 多人协作时启用。创建集合但不需要索引。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `_id` | string | 文档主键 |
+| `name` | string | 家庭名称 |
+| `ownerUserId` | string | 创建者用户 ID |
+| `members` | array | 成员列表 |
+| `members[].userId` | string | 成员用户 ID |
+| `members[].role` | string | `"owner"` / `"member"` |
+| `members[].joinedAt` | string | 加入时间 |
+| `createdAt` | string | 创建时间 |
+
+**索引：** 无需创建。
+
+---
+
+### 索引创建汇总
+
+为方便对照，所有索引汇总如下：
+
+| 集合 | 索引名 | 索引字段 | 类型 |
+|------|--------|---------|------|
+| `users` | `idx_openId` | `openId` | 单字段 |
+| `babies` | `idx_userId` | `userId` | 单字段 |
+| `reminder_tasks` | `idx_nextRemindTime_enabled` | `nextRemindTime` + `enabled` | 复合 |
+| `reminder_tasks` | `idx_babyId` | `babyId` | 单字段 |
+| `reminder_tasks` | `idx_userId_enabled` | `userId` + `enabled` | 复合 |
+| `confirm_logs` | `idx_babyId_completedTime` | `babyId` + `completedTime` | 复合 |
+| `subscription_quotas` | `idx_openId_status_expireAt` | `openId` + `status` + `expireAt` | 复合 |
+| `notification_logs` | `idx_taskId_sendTime` | `taskId` + `sendTime` | 复合 |
+
+> **创建方式**：云开发控制台 → 数据库 → 选中集合 → 索引管理 → 添加索引。复合索引需按上表顺序添加字段。
 
 ## 快速开始
 
@@ -243,32 +438,110 @@ npm run type-check
 
 ### 5. 云函数部署
 
+> **重要**: 编译时 Vite 插件会自动将 `cloudfunctions/` 复制到 `dist/dev/mp-weixin/cloudfunctions/`（或 `dist/build/mp-weixin/cloudfunctions/`），微信开发者工具导入编译输出目录后即可看到云函数文件夹。
+>
+> 每个云函数已内联 `utils.js`（公共工具库），可独立部署。`shared/` 目录仅为源文件参考，不会出现在编译输出中，也无需上传。
+
 1. 在 `cloudfunctions/api-subscribe/index.js` 中替换 `TEMPLATES` 为实际申请的模板ID
-2. 在 `src/manifest.json` 中填写小程序 `appid`
-3. 在 `src/App.vue` 中替换云环境 ID（搜索 `baby-guardian-prod`）
-4. 使用微信开发者工具上传部署所有云函数
-5. 在云开发控制台创建 7 个数据库集合并添加索引
+2. 在 `src/manifest.json` 中填写小程序 `appid`（`mp-weixin.appid` 字段）
+3. 在 `src/App.vue` 中替换云环境 ID（搜索 `cloudbase-d8g1n7nag24fc86c3`，替换为你自己的环境 ID）
+4. 运行 `npm run dev:mp-weixin` 编译，确认 `dist/dev/mp-weixin/cloudfunctions/` 目录存在
+5. 用微信开发者工具导入 `dist/dev/mp-weixin/` 目录
+6. 在开发者工具左侧文件树中找到 `cloudfunctions/` 文件夹，右键**每个**云函数（共 7 个）→ **上传并部署：云端安装依赖**
+7. 在云开发控制台创建 7 个数据库集合并添加索引（详见上方 [数据库集合与索引](#数据库集合与索引) 章节）
 
-### 6. 数据库索引
+| 云函数 | 说明 |
+|--------|------|
+| api-baby | 宝宝管理 CRUD |
+| api-task | 事项管理 CRUD |
+| api-confirm | 确认记录 |
+| api-stats | 统计数据 |
+| api-subscribe | 订阅消息 |
+| cron-scan | 定时扫描提醒（每分钟） |
+| cron-cleanup | 定时清理过期数据（每小时） |
 
-在云开发控制台为以下集合创建索引：
+### 6. 定时触发器配置
 
-| 集合 | 索引字段 | 类型 |
+项目已在云函数目录中预置 `config.json` 触发器配置文件，**上传部署云函数时会自动创建触发器**，无需手动操作。
+
+#### 预置的触发器配置
+
+| 云函数 | 配置文件 | Cron 表达式 | 执行频率 | 说明 |
+|--------|---------|------------|---------|------|
+| `cron-scan` | `cloudfunctions/cron-scan/config.json` | `0 * * * * * *` | 每分钟 | 扫描到期事项，发送订阅消息 |
+| `cron-cleanup` | `cloudfunctions/cron-cleanup/config.json` | `0 0 * * * * *` | 每小时 | 清理过期配额、解锁超时锁、删除旧日志 |
+
+#### Cron 表达式格式
+
+微信云开发使用 **7 字段** Cron 表达式（比标准 Cron 多一个年字段）：
+
+```
+秒  分  时  日  月  周  年
+0   *   *   *   *   *   *     ← 每分钟第 0 秒执行
+0   0   *   *   *   *   *     ← 每小时第 0 分 0 秒执行
+```
+
+| 字段 | 取值范围 | 说明 |
 |------|---------|------|
-| reminder_tasks | nextRemindTime + enabled | 复合索引 |
-| reminder_tasks | babyId | 单字段 |
-| reminder_tasks | userId + enabled | 复合索引 |
-| subscription_quotas | openId + status + expireAt | 复合索引 |
-| confirm_logs | babyId + completedTime | 复合索引 |
-| notification_logs | taskId + sendTime | 复合索引 |
-| babies | userId | 单字段 |
+| 秒 | 0-59 | 第几秒执行 |
+| 分 | 0-59 | 第几分执行 |
+| 时 | 0-23 | 第几时执行 |
+| 日 | 1-31 | 几号执行 |
+| 月 | 1-12 | 几月执行 |
+| 周 | 0-6 | 周几（0=周日） |
+| 年 | 留空 | 不填表示每年 |
 
-### 7. 定时触发器配置
+> `*` 表示任意值，`0` 表示固定值。`0 * * * * * *` = 每分钟的第 0 秒触发。
 
-在微信开发者工具中为云函数添加定时触发器：
+#### 配置文件内容
 
-- `cron-scan`: `0 * * * * * *` (每分钟)
-- `cron-cleanup`: `0 0 * * * * *` (每小时)
+`cron-scan/config.json`：
+```json
+{
+  "triggers": [
+    {
+      "name": "scanEveryMinute",
+      "type": "timer",
+      "config": "0 * * * * * *"
+    }
+  ]
+}
+```
+
+`cron-cleanup/config.json`：
+```json
+{
+  "triggers": [
+    {
+      "name": "cleanupEveryHour",
+      "type": "timer",
+      "config": "0 0 * * * * *"
+    }
+  ]
+}
+```
+
+#### 操作步骤
+
+触发器会在上传部署云函数时自动创建，无需额外操作：
+
+1. 确保已完成第 5 步的云函数上传部署
+2. 右键 `cron-scan` → **上传并部署：云端安装依赖** → 触发器自动创建
+3. 右键 `cron-cleanup` → **上传并部署：云端安装依赖** → 触发器自动创建
+4. 验证：打开**云开发控制台** → **云函数** → 选中 `cron-scan` → **触发器** tab，可以看到已创建的定时触发器
+
+#### 手动管理触发器（可选）
+
+如果需要修改触发频率或手动管理：
+
+| 操作 | 方法 |
+|------|------|
+| 修改触发频率 | 编辑 `config.json` 中的 `config` 字段 → 重新上传部署该云函数 |
+| 查看触发器 | 云开发控制台 → 云函数 → 选中函数 → 触发器 tab |
+| 手动测试 | 云开发控制台 → 云函数 → 选中函数 → 点击「测试」→ 传入空 `{}` 即可手动触发 |
+| 删除触发器 | 云开发控制台 → 云函数 → 触发器 tab → 删除对应触发器 |
+
+> **注意**：触发器创建后立即生效。`cron-scan` 部署后每分钟都会执行，可在云函数日志中查看执行记录。如果数据库尚未准备好，建议先完成数据库集合创建再部署 `cron-scan`。
 
 ## Sass 配置说明
 
