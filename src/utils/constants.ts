@@ -3,6 +3,12 @@
  */
 import type { TaskType, TaskPriority, TemplateKey, SubscribeTemplate, FamilyRelation } from '@/types';
 
+/** 执行模式配置 */
+export const TASK_MODE_CONFIG = {
+  recurring: { name: '重复', color: '#FF7B7B', bgColor: '#FFF0F0' },
+  once: { name: '单次', color: '#7B9EFF', bgColor: '#F0F4FF' },
+} as const;
+
 /** 事项类型配置 */
 export const TASK_TYPE_CONFIG: Record<TaskType, {
   name: string;

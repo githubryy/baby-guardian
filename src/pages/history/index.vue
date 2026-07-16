@@ -132,6 +132,7 @@ async function loadHistory(reset = true) {
     const result = await getConfirmHistory({
       startDate: filterStartDate.value || undefined,
       endDate: filterEndDate.value || undefined,
+      taskType: filterType.value || undefined,
       page: page.value,
       pageSize,
     });
@@ -181,7 +182,12 @@ const groupedHistory = computed(() => {
 });
 
 function getTypeConfig(item: ConfirmLog) {
-  return TASK_TYPE_CONFIG.custom;
+  // 优先使用日志中记录的事项类型，不存在时回退到自定义
+  const config = item.taskType ? TASK_TYPE_CONFIG[item.taskType] : undefined;
+  if (config) {
+    return { ...config, name: item.taskName || config.name };
+  }
+  return { ...TASK_TYPE_CONFIG.custom, name: item.taskName || '未知事项' };
 }
 
 function actionText(action: ConfirmAction): string {
@@ -189,8 +195,9 @@ function actionText(action: ConfirmAction): string {
     completed: '已完成',
     delayed: '已延迟',
     ignored: '已忽略',
+    paused: '已暂停',
   };
-  return map[action];
+  return map[action] || action;
 }
 
 function getOperatorColor(relation?: FamilyRelation): string {

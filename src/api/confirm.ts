@@ -11,6 +11,8 @@ export function confirmTask(data: {
   action: ConfirmAction;
   delayMinutes?: number;
   remark?: string;
+  taskType?: string;
+  taskName?: string;
 }): Promise<ConfirmLog> {
   return callCloud<ConfirmLog>(CLOUD_FUNCTIONS.CONFIRM, { action: 'confirm', data });
 }
@@ -19,6 +21,7 @@ export function confirmTask(data: {
 export function getConfirmHistory(params: {
   babyId?: string;
   taskId?: string;
+  taskType?: string;
   startDate?: string;
   endDate?: string;
   page?: number;

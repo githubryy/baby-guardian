@@ -234,6 +234,7 @@ const priorityHint = computed(() => {
 const activeTaskTypes = computed(() => {
   if (isEdit.value) return new Set<TaskType>(); // 编辑模式下不限制
   const babyId = babyStore.currentBabyId;
+  console.log('activeTaskTypes', taskStore.taskList);
   return new Set(
     taskStore.taskList
       .filter((t) => t.babyId === babyId && t.enabled)
@@ -331,6 +332,7 @@ async function onSave() {
     const data = {
       babyId: babyStore.currentBabyId,
       type: form.value.type,
+      typeName: TASK_TYPE_CONFIG[form.value.type].name, 
       customName: form.value.type === 'custom' ? form.value.customName.trim() : undefined,
       firstTime: form.value.firstTime,
       intervalMinutes: form.value.intervalMinutes,
@@ -349,9 +351,10 @@ async function onSave() {
         setTimeout(() => uni.navigateBack(), 600);
       }
     } else {
+      // 在 tap 上下文中先发起订阅授权，避免 await 后丢失手势上下文
+      await guideBatchAuthorization('添加事项后');
       const ok = await taskStore.addTask(data);
       if (ok) {
-        guideBatchAuthorization('添加事项后');
         setTimeout(() => uni.navigateBack(), 600);
       }
     }

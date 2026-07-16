@@ -124,6 +124,21 @@
             </view>
           </view>
 
+          <!-- 已结束事项 -->
+          <view v-if="pausedItems.length > 0" class="section">
+            <view class="section-header">
+              <view class="section-title-wrap">
+                <view class="section-dot paused-dot" />
+                <text class="section-title">已结束</text>
+              </view>
+              <u-tag :text="String(pausedItems.length)" type="primary" size="mini" shape="circle" plain />
+            </view>
+            <view class="section-list fade-in">
+              <TimelineItemComp v-for="item in pausedItems" :key="item.taskId" :item="item"
+                @item-tap="goTaskDetail" />
+            </view>
+          </view>
+
           <!-- 无事项 -->
           <EmptyState v-if="timeline.length === 0" uIcon="checkmark-circle-fill" text="今日暂无提醒"
             subText="点击下方按钮添加提醒事项" actionText="添加事项" @action="goAddTask" />
@@ -158,7 +173,7 @@ const babyStore = useBabyStore();
 const taskStore = useTaskStore();
 const userStore = useUserStore();
 const { currentBaby, hasBaby, currentBabyAge } = storeToRefs(babyStore);
-const { timeline, pendingItems, completedItems, overdueItems } = storeToRefs(taskStore);
+const { timeline, pendingItems, completedItems, overdueItems, pausedItems } = storeToRefs(taskStore);
 
 const statusBarHeight = ref(44);
 const refreshing = ref(false);
@@ -254,10 +269,13 @@ function initLoad() {
 async function loadData() {
   loading.value = true;
   try {
-    // 并行加载宝宝列表和时间线，提升加载速度
+    // 并行加载宝宝列表、时间线和事项列表，提升加载速度
     await babyStore.loadBabyList();
     if (hasBaby.value && currentBaby.value?._id) {
-      await taskStore.loadTimeline(currentBaby.value._id);
+      await Promise.all([
+        taskStore.loadTimeline(currentBaby.value._id),
+        taskStore.loadTaskList(currentBaby.value._id),
+      ]);
     }
     userStore.refreshQuota();
   } catch (e: any) {
@@ -294,12 +312,24 @@ function goTaskDetail(item: TimelineItem) {
 }
 
 async function handleComplete(item: TimelineItem) {
-  await taskStore.confirmTask({
-    taskId: item.taskId,
-    action: 'completed',
-  });
-  guideBatchAuthorization('完成确认后');
-  userStore.refreshQuota();
+  // 在 tap 上下文中先发起订阅授权，避免 await 后丢失手势上下文
+  await guideBatchAuthorization('完成确认后');
+  uni.showLoading({ title: '处理中...', mask: true });
+  try {
+    await taskStore.confirmTask({
+      taskId: item.taskId,
+      action: 'completed',
+      taskType: item.type,
+      taskName: item.typeName,
+    });
+    userStore.refreshQuota();
+    await loadData();
+  } catch (e: any) {
+    console.error('[handleComplete] 操作失败:', e);
+    uni.showToast({ title: '操作失败，请重试', icon: 'none' });
+  } finally {
+    uni.hideLoading();
+  }
 }
 
 async function handleDelay(item: TimelineItem) {
@@ -307,20 +337,42 @@ async function handleDelay(item: TimelineItem) {
     itemList: ['延迟15分钟', '延迟30分钟', '延迟1小时', '延迟2小时'],
     success: async (res) => {
       const minutes = [15, 30, 60, 120][res.tapIndex];
-      await taskStore.confirmTask({
-        taskId: item.taskId,
-        action: 'delayed',
-        delayMinutes: minutes,
-      });
+      uni.showLoading({ title: '处理中...', mask: true });
+      try {
+        await taskStore.confirmTask({
+          taskId: item.taskId,
+          action: 'delayed',
+          delayMinutes: minutes,
+          taskType: item.type,
+          taskName: item.typeName,
+        });
+        loadData();
+      } catch (e: any) {
+        console.error('[handleDelay] 操作失败:', e);
+        uni.showToast({ title: '操作失败，请重试', icon: 'none' });
+      } finally {
+        uni.hideLoading();
+      }
     },
   });
 }
 
 async function handleIgnore(item: TimelineItem) {
-  await taskStore.confirmTask({
-    taskId: item.taskId,
-    action: 'ignored',
-  });
+  uni.showLoading({ title: '处理中...', mask: true });
+  try {
+    await taskStore.confirmTask({
+      taskId: item.taskId,
+      action: 'ignored',
+      taskType: item.type,
+      taskName: item.typeName,
+    });
+    loadData();
+  } catch (e: any) {
+    console.error('[handleIgnore] 操作失败:', e);
+    uni.showToast({ title: '操作失败，请重试', icon: 'none' });
+  } finally {
+    uni.hideLoading();
+  }
 }
 </script>
 
@@ -555,6 +607,11 @@ async function handleIgnore(item: TimelineItem) {
         &.completed-dot {
           background: #1d9e75;
           box-shadow: 0 0 0 4rpx rgba(29, 158, 117, 0.15);
+        }
+
+        &.paused-dot {
+          background: #7f77dd;
+          box-shadow: 0 0 0 4rpx rgba(127, 119, 221, 0.15);
         }
       }
 

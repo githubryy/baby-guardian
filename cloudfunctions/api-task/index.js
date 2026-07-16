@@ -182,9 +182,14 @@ async function handleTimeline(userId, familyId, babyId) {
 
   // 构建操作人映射（用于显示谁完成了事项）
   const confirmByTask = {};
+  const pausedTaskIds = new Set();
   confirmLogs.forEach((log) => {
     if (!confirmByTask[log.taskId]) {
       confirmByTask[log.taskId] = log;
+    }
+    // 收集今日被暂停的任务
+    if (log.action === 'paused') {
+      pausedTaskIds.add(log.taskId);
     }
   });
 
@@ -204,32 +209,15 @@ async function handleTimeline(userId, familyId, babyId) {
   const timeline = [];
   const confirmedTaskIds = new Set(confirmLogs.map((l) => l.taskId));
 
-  tasks.forEach((task) => {
+  /** 构建单条 timeline 条目 */
+  function buildItem(task, opts = {}) {
+    const { status, isRecurring = false } = opts;
     const config = TASK_TYPE_CONFIG[task.type] || TASK_TYPE_CONFIG.custom;
     const baby = babyMap[task.babyId];
-    const isConfirmed = confirmedTaskIds.has(task._id);
-    const remindTime = new Date(task.nextRemindTime);
     const confirmLog = confirmByTask[task._id];
+    const assignee = status !== 'paused' && task.assigneeId ? memberMap[task.assigneeId] : null;
 
-    let status = 'pending';
-    // 循环事件: 只要未结束，始终视为待处理（不因已确认而标为已完成）
-    const isRecurring = task.taskMode === 'recurring';
-    if (isRecurring) {
-      if (remindTime.getTime() < now.getTime()) {
-        status = 'overdue';
-      }
-    } else {
-      if (isConfirmed) {
-        status = 'completed';
-      } else if (remindTime.getTime() < now.getTime()) {
-        status = 'overdue';
-      }
-    }
-
-    // 指定负责人信息
-    const assignee = task.assigneeId ? memberMap[task.assigneeId] : null;
-
-    timeline.push({
+    return {
       taskId: task._id,
       babyId: task.babyId,
       babyName: baby?.name || '未知',
@@ -239,28 +227,53 @@ async function handleTimeline(userId, familyId, babyId) {
       typeName: config.name,
       typeIcon: config.icon,
       typeColor: config.color,
-      remindTime: task.nextRemindTime,
+      remindTime: task.nextRemindTime || task.createdAt,
       lastDurationText: task.lastCompletedTime ? getDurationText(task.lastCompletedTime) : null,
       status,
       priority: task.priority,
-      // 操作人信息
       completedByName: confirmLog?.operatorName || null,
       completedByAvatar: confirmLog?.operatorAvatar || null,
       completedByRelation: confirmLog?.operatorRelation || null,
       completedAt: confirmLog?.completedTime || null,
-      // 指定负责人
       assigneeName: assignee?.nickName || null,
       assigneeAvatar: assignee?.avatarUrl || null,
-      // 循环事件相关字段
       taskMode: task.taskMode || null,
       repeatCount: task.repeatCount ?? null,
       completedCount: task.completedCount ?? null,
       intervalMinutes: task.intervalMinutes ?? null,
       nextRemindTime: task.nextRemindTime || null,
-      // 下次执行剩余时间（仅循环事件）
       nextRemindRemaining: isRecurring ? getRemainingText(task.nextRemindTime) : null,
-    });
+    };
+  }
+
+  tasks.forEach((task) => {
+    const remindTime = new Date(task.nextRemindTime);
+    const isRecurring = task.taskMode === 'recurring';
+    const isConfirmed = confirmedTaskIds.has(task._id);
+
+    let status = 'pending';
+    if (isRecurring) {
+      if (remindTime.getTime() < now.getTime()) status = 'overdue';
+    } else {
+      if (isConfirmed) status = 'completed';
+      else if (remindTime.getTime() < now.getTime()) status = 'overdue';
+    }
+
+    timeline.push(buildItem(task, { status, isRecurring }));
   });
+
+  // 补充今日被临时结束的任务（enabled=false 不会在常规查询中返回）
+  if (pausedTaskIds.size > 0) {
+    const { data: pausedTasks } = await db.collection('reminder_tasks')
+      .where({ _id: db.command.in(Array.from(pausedTaskIds)) })
+      .get();
+
+    pausedTasks.forEach((task) => {
+      if (!timeline.some((t) => t.taskId === task._id)) {
+        timeline.push(buildItem(task, { status: 'paused' }));
+      }
+    });
+  }
 
   return success(timeline);
 }

@@ -231,6 +231,13 @@ function getRelationColor(relation?: FamilyRelation): string {
   return FAMILY_RELATION_CONFIG[relation]?.color || '#999';
 }
 
+/** 获取事项名称（用于日志记录） */
+function getTaskName(): string {
+  if (!task.value) return '未命名';
+  if (task.value.type === 'custom') return task.value.customName || '自定义事项';
+  return TASK_TYPE_CONFIG[task.value.type]?.name || task.value.type || '未命名';
+}
+
 async function onComplete() {
   if (submitting.value) return;
   submitting.value = true;
@@ -239,6 +246,8 @@ async function onComplete() {
     const ok = await taskStore.confirmTask({
       taskId: taskId.value,
       action: 'completed',
+      taskType: task.value?.type,
+      taskName: getTaskName(),
     });
     if (ok) {
       await guideBatchAuthorization('完成确认后');
@@ -287,6 +296,8 @@ function onDelay() {
           taskId: taskId.value,
           action: 'delayed',
           delayMinutes: minutes,
+          taskType: task.value?.type,
+          taskName: getTaskName(),
         });
         if (ok) {
           uni.showToast({ title: `已延迟${minutes}分钟`, icon: 'none' });
@@ -314,6 +325,8 @@ async function onIgnore() {
           const ok = await taskStore.confirmTask({
             taskId: taskId.value,
             action: 'ignored',
+            taskType: task.value?.type,
+            taskName: getTaskName(),
           });
           if (ok) uni.navigateBack();
         } finally {
@@ -339,6 +352,8 @@ async function onPause() {
           const ok = await taskStore.confirmTask({
             taskId: taskId.value,
             action: 'paused',
+            taskType: task.value?.type,
+            taskName: getTaskName(),
           });
           if (ok) {
             uni.showToast({ title: '事件已结束，需重新添加才能恢复', icon: 'none', duration: 2000 });

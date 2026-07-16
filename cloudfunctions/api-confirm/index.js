@@ -37,19 +37,21 @@ exports.main = async (event, context) => {
  * V2.0: 写入操作人信息（operatorId/operatorName/operatorAvatar/operatorRelation）
  */
 async function handleConfirm(userId, familyId, currentUser, data) {
-  const { taskId, action, delayMinutes, remark } = data;
+  const { taskId, action, delayMinutes, remark, taskType, taskName } = data;
   const now = nowISO();
 
   // 获取事项
   const { data: task } = await db.collection('reminder_tasks').doc(taskId).get();
   if (!task) return fail('事项不存在');
 
-  // 写入确认日志（含操作人信息）
+  // 写入确认日志（含操作人信息 + 事项类型/名称，由前端传入）
   const log = {
     taskId,
     babyId: task.babyId,
     userId,
     familyId,
+    taskType: taskType || task.type || 'custom',
+    taskName: taskName || task.customName || '未命名',
     action,
     completedTime: now,
     delayMinutes: delayMinutes || null,
@@ -88,12 +90,12 @@ async function handleConfirm(userId, familyId, currentUser, data) {
     }
     await db.collection('reminder_tasks').doc(taskId).update({ data: updateData });
   } else if (action === 'delayed') {
-    // 延迟: 推迟到指定时间后
-    const nextRemind = new Date();
-    nextRemind.setMinutes(nextRemind.getMinutes() + (delayMinutes || 15));
+    // 延迟: 在 nextRemindTime 基础上再推迟
+    const baseTime = task.nextRemindTime ? new Date(task.nextRemindTime) : new Date();
+    baseTime.setMinutes(baseTime.getMinutes() + (delayMinutes || 15));
     await db.collection('reminder_tasks').doc(taskId).update({
       data: {
-        nextRemindTime: nextRemind.toISOString(),
+        nextRemindTime: baseTime.toISOString(),
         processingLock: false,
         lockedAt: null,
       },
@@ -126,11 +128,12 @@ async function handleConfirm(userId, familyId, currentUser, data) {
 
 /** 获取确认历史（按家庭查询） */
 async function handleHistory(userId, familyId, params = {}) {
-  const { babyId, taskId, startDate, endDate, page = 1, pageSize = 20 } = params;
+  const { babyId, taskId, taskType, startDate, endDate, page = 1, pageSize = 20 } = params;
 
   const query = { familyId };
   if (babyId) query.babyId = babyId;
   if (taskId) query.taskId = taskId;
+  if (taskType) query.taskType = taskType;
   if (startDate || endDate) {
     query.completedTime = {};
     if (startDate) query.completedTime = _.gte(startDate);

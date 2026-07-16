@@ -6,6 +6,7 @@
     <view class="task-info">
       <view class="info-header">
         <text class="task-name">{{ task.customName || typeConfig.name }}</text>
+        <u-tag :text="modeConfig.name" :type="modeTagType" size="mini" shape="circle" plain />
         <u-tag :text="priorityConfig.name" :type="priorityTagType" size="mini" shape="circle" plain />
       </view>
       <view class="info-meta">
@@ -32,7 +33,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { ReminderTask } from '@/types';
-import { TASK_TYPE_CONFIG, PRIORITY_CONFIG } from '@/utils/constants';
+import { TASK_TYPE_CONFIG, PRIORITY_CONFIG, TASK_MODE_CONFIG } from '@/utils/constants';
 import { relativeTime, durationText } from '@/utils/time';
 
 const props = defineProps<{
@@ -46,6 +47,8 @@ const emit = defineEmits<{
 
 const typeConfig = computed(() => TASK_TYPE_CONFIG[props.task.type]);
 const priorityConfig = computed(() => PRIORITY_CONFIG[props.task.priority]);
+const modeConfig = computed(() => TASK_MODE_CONFIG[props.task.taskMode || 'once']);
+const modeTagType = computed<'error' | 'primary'>(() => props.task.taskMode === 'recurring' ? 'error' : 'primary');
 
 const priorityTagType = computed<'error' | 'warning' | 'primary'>(() => {
   const map = { p0: 'error' as const, p1: 'warning' as const, p2: 'primary' as const };

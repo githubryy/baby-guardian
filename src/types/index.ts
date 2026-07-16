@@ -136,6 +136,10 @@ export interface ConfirmLog {
   taskId: string;
   babyId: string;
   userId: string;
+  /** 事项类型（旧数据可能缺失） */
+  taskType?: TaskType;
+  /** 事项名称（自定义类型时为 customName，否则为内置名称，旧数据可能缺失） */
+  taskName?: string;
   action: ConfirmAction;
   /** 实际完成时间 */
   completedTime: string;

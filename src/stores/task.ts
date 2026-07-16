@@ -20,6 +20,7 @@ export const useTaskStore = defineStore('task', () => {
   const pendingItems = computed(() => timeline.value.filter((t) => t.status === 'pending'));
   const completedItems = computed(() => timeline.value.filter((t) => t.status === 'completed'));
   const overdueItems = computed(() => timeline.value.filter((t) => t.status === 'overdue'));
+  const pausedItems = computed(() => timeline.value.filter((t) => t.status === 'paused'));
 
   // ===== Actions =====
 
@@ -133,6 +134,8 @@ export const useTaskStore = defineStore('task', () => {
     action: 'completed' | 'delayed' | 'ignored' | 'paused';
     delayMinutes?: number;
     remark?: string;
+    taskType?: string;
+    taskName?: string;
   }): Promise<boolean> {
     try {
       await confirmApi.confirmTask(data);
@@ -169,8 +172,6 @@ export const useTaskStore = defineStore('task', () => {
           // 同时在 taskList 中禁用该任务，使其不可恢复
           const task = taskList.value.find((t) => t._id === data.taskId);
           if (task) task.enabled = false;
-          // 从时间线中移除
-          timeline.value = timeline.value.filter((t) => t.taskId !== data.taskId);
         }
       }
       showSuccess(data.action === 'completed' ? '已完成' : data.action === 'delayed' ? '已延迟' : data.action === 'paused' ? '已结束' : '已忽略');
@@ -189,6 +190,7 @@ export const useTaskStore = defineStore('task', () => {
     pendingItems,
     completedItems,
     overdueItems,
+    pausedItems,
     loadTaskList,
     loadTimeline,
     addTask,
