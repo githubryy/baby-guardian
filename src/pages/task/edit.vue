@@ -255,8 +255,7 @@ async function onSave() {
       const ok = await taskStore.addTask(data);
       if (ok) {
         const { guideBatchAuthorization } = await import('@/utils/subscribe');
-        guideBatchAuthorization('添加事项后');
-        uni.showToast({ title: '已添加', icon: 'success' });
+        await guideBatchAuthorization('添加事项后');
         setTimeout(() => uni.navigateBack(), 600);
       }
     }

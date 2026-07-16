@@ -6,7 +6,7 @@
     </view>
 
     <view v-if="babyList.length > 0" class="baby-list slide-up-stagger">
-      <BabyCard v-for="baby in babyList" :key="baby._id" :baby="baby" @tap="onEditBaby(baby)" />
+      <BabyCard v-for="baby in babyList" :key="baby._id" :baby="baby" @tap="onSelectBaby(baby)" @edit="onEditBaby(baby)"/>
     </view>
 
     <view class="add-btn-wrap tap-feedback">

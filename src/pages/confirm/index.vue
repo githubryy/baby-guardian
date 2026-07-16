@@ -141,7 +141,6 @@ async function loadTask() {
     } else {
       task.value = await getTaskDetail(taskId.value);
     }
-    console.log('task.value', task.value)
   } catch (err) {
     console.error('[加载事项详情失败]', err);
   }

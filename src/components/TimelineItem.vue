@@ -41,7 +41,7 @@
             <u-icon v-else :name="getRelationIcon(item.completedByRelation)" :size="14" :color="getRelationColor(item.completedByRelation)" />
           </view>
           <text class="operator-name">{{ item.completedByName }}</text>
-          <text class="operator-relation" :style="{ color: getRelationColor(item.completedByRelation) }">{{ getRelationName(item.completedByRelation) }}</text>
+          <!-- <text class="operator-relation" :style="{ color: getRelationColor(item.completedByRelation) }">{{ getRelationName(item.completedByRelation) }}</text> -->
           <text class="operator-action">已完成</text>
         </view>
 

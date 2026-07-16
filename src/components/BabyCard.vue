@@ -22,8 +22,8 @@
         </template>
       </view>
     </view>
-    <view class="actions">
-      <u-button text="编辑" size="mini" shape="circle" plain @click.stop="$emit('edit', baby)" />
+    <view class="actions" @tap.stop>
+      <u-button text="编辑" size="mini" shape="circle" plain @tap="$emit('edit', baby)" />
     </view>
   </view>
 </template>
