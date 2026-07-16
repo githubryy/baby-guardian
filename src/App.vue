@@ -1,27 +1,51 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app';
 import { useUserStore } from '@/stores/user';
 import { useFamilyStore } from '@/stores/family';
 
+// 全局就绪状态：页面可据此判断云开发是否初始化完成
+const appReady = ref(false);
+const initError = ref('');
+
 onLaunch(() => {
   console.log('App Launch - 宝宝守护者');
-  // 初始化云开发
-  if (wx.cloud) {
-    wx.cloud.init({
-      env: 'cloudbase-d8g1n7nag24fc86c3',
-      traceUser: true,
-    });
-  }
-  // 尝试静默登录
-  const userStore = useUserStore();
-  const familyStore = useFamilyStore();
-  userStore.initLogin().then(() => {
-    // 登录成功后加载家庭信息
+  initApp();
+});
+
+async function initApp() {
+  try {
+    // 1. 初始化云开发
+    if (wx.cloud) {
+      wx.cloud.init({
+        env: 'cloudbase-d8g1n7nag24fc86c3',
+        traceUser: true,
+      });
+      console.log('[App] 云开发初始化完成');
+    } else {
+      console.warn('[App] wx.cloud 不可用');
+    }
+
+    // 2. 静默登录
+    const userStore = useUserStore();
+    const familyStore = useFamilyStore();
+    await userStore.initLogin();
+    console.log('[App] 登录完成, isLogin:', userStore.isLogin);
+
+    // 3. 登录成功后加载家庭信息
     if (userStore.isLogin) {
       familyStore.loadFamily();
     }
-  });
-});
+  } catch (e: any) {
+    console.error('[App] 初始化失败:', e);
+    initError.value = e?.message || '初始化失败';
+  } finally {
+    appReady.value = true;
+  }
+}
+
+// 暴露给子组件使用
+uni.$appReady = appReady;
 
 onShow(() => {
   console.log('App Show');

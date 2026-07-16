@@ -3,18 +3,34 @@
  */
 import type { CloudResult } from '@/types';
 
+/** 云函数默认超时时间（毫秒） */
+const CLOUD_TIMEOUT = 15000;
+
 /**
  * 调用云函数
  * @param name 云函数名
  * @param data 请求数据
+ * @param timeout 超时时间（毫秒），默认 15 秒
  * @returns 云函数返回结果
  */
-export function callCloud<T = any>(name: string, data?: Record<string, any>): Promise<T> {
+export function callCloud<T = any>(name: string, data?: Record<string, any>, timeout = CLOUD_TIMEOUT): Promise<T> {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        console.error(`[云函数超时] ${name}`);
+        reject(new Error(`云函数调用超时: ${name}`));
+      }
+    }, timeout);
+
     wx.cloud.callFunction({
       name,
       data: data || {},
       success(res) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
         const result = res.result as CloudResult<T>;
         if (result && result.code === 0) {
           resolve(result.data);
@@ -25,6 +41,9 @@ export function callCloud<T = any>(name: string, data?: Record<string, any>): Pr
         }
       },
       fail(err) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
         console.error(`[云函数调用失败] ${name}:`, err);
         uni.showToast({ title: '网络异常，请稍后重试', icon: 'none' });
         reject(err);

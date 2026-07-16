@@ -3,7 +3,7 @@
   "cloudfunctionRoot": "./cloudfunctions",
   "projectname": "baby-guardian",
   "description": "宝宝守护者 - 育儿提醒微信小程序",
-  "appid": "",
+  "appid": "wxfaf539a809a19e06",
   "setting": {
     "urlCheck": false,
     "es6": true,

@@ -142,7 +142,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app';
 import { storeToRefs } from 'pinia';
 import { useBabyStore } from '@/stores/baby';
@@ -203,25 +203,72 @@ const progressPercent = computed(() => {
 onMounted(() => {
   const sysInfo = uni.getSystemInfoSync();
   statusBarHeight.value = sysInfo.statusBarHeight || 44;
-  loadData();
+  // 首次加载等待 App 初始化完毕
+  initLoad();
 });
 
 onShow(() => {
-  loadData();
+  // 非首次加载直接刷新数据
+  if (hasInitLoaded) {
+    loadData();
+  }
 });
 
 onPullDownRefresh(() => {
   loadData().finally(() => uni.stopPullDownRefresh());
 });
 
+let hasInitLoaded = false;
+
+// 首次加载：等待 App 就绪后再加载数据
+function initLoad() {
+  if (hasInitLoaded) return;
+  // 如果 App 已就绪，直接加载
+  if (uni.$appReady?.value) {
+    hasInitLoaded = true;
+    loadData();
+    return;
+  }
+  // 否则等待 App 就绪后再加载（最多等 8 秒）
+  const stopWatch = watch(
+    () => uni.$appReady?.value,
+    (ready) => {
+      if (ready) {
+        stopWatch();
+        hasInitLoaded = true;
+        nextTick(() => loadData());
+      }
+    },
+    { immediate: false }
+  );
+  // 超时兜底：8 秒后无论如何都加载
+  setTimeout(() => {
+    stopWatch();
+    if (!hasInitLoaded) {
+      hasInitLoaded = true;
+      loadData();
+    }
+  }, 8000);
+}
+
 async function loadData() {
   loading.value = true;
-  await babyStore.loadBabyList();
-  if (hasBaby.value) {
-    await taskStore.loadTimeline(currentBaby.value?._id);
+  try {
+    // 并行加载宝宝列表和时间线，提升加载速度
+    await babyStore.loadBabyList();
+    if (hasBaby.value && currentBaby.value?._id) {
+      await taskStore.loadTimeline(currentBaby.value._id);
+    }
+    userStore.refreshQuota();
+  } catch (e: any) {
+    console.error('[loadData] 加载失败:', e);
+    // 只有非静默错误才弹提示（避免 toast 刷屏）
+    if (e?.message && e.message !== '云函数调用超时: api-baby') {
+      uni.showToast({ title: '加载失败，请下拉刷新', icon: 'none' });
+    }
+  } finally {
+    loading.value = false;
   }
-  userStore.refreshQuota();
-  loading.value = false;
 }
 
 async function onRefresh() {
