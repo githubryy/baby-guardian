@@ -6,9 +6,7 @@ declare module '*.vue' {
   export default component;
 }
 
-// uni-app 全局属性扩展
-declare namespace UniApp {
-  interface Uni {
-    $appReady?: import('vue').Ref<boolean>;
-  }
+// 扩展 uni 全局属性
+interface Uni {
+  $appReady?: import('vue').Ref<boolean>;
 }

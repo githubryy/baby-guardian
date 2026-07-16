@@ -81,6 +81,13 @@
       "style": {
         "navigationBarTitleText": "加入家庭"
       }
+    },
+    {
+      "path": "pages/onboarding/role",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "选择身份"
+      }
     }
   ],
   "globalStyle": {

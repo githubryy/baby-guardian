@@ -137,6 +137,7 @@ const avatarIconColor = computed(() => {
 });
 
 onLoad((options) => {
+  console.log('options', options);
   if (options?.id) {
     isEdit.value = true;
     editId.value = options.id;
@@ -173,9 +174,26 @@ function chooseAvatar() {
     count: 1,
     sizeType: ['compressed'],
     success: (res) => {
-      form.value.avatarUrl = res.tempFilePaths[0];
+      uploadAvatar(res.tempFilePaths[0]);
     },
   });
+}
+
+async function uploadAvatar(tempPath: string) {
+  try {
+    uni.showLoading({ title: '上传中...' });
+    const cloudPath = `baby-avatars/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+    const uploadRes = await wx.cloud.uploadFile({
+      cloudPath,
+      filePath: tempPath,
+    });
+    form.value.avatarUrl = uploadRes.fileID;
+  } catch (err) {
+    console.error('[头像上传失败]', err);
+    uni.showToast({ title: '头像上传失败', icon: 'none' });
+  } finally {
+    uni.hideLoading();
+  }
 }
 
 async function onSave() {
@@ -202,6 +220,7 @@ async function onSave() {
       isPremature: form.value.isPremature,
       dueDate: form.value.dueDate ? new Date(form.value.dueDate).toISOString() : undefined,
       remark: form.value.remark.trim() || undefined,
+      avatarUrl: form.value.avatarUrl || undefined,
     };
 
     if (isEdit.value) {
@@ -378,6 +397,7 @@ async function onDelete() {
 
 .action-area {
   position: fixed;
+  z-index: 1000;
   bottom: 0;
   left: 0;
   right: 0;

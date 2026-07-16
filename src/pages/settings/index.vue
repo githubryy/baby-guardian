@@ -1,7 +1,7 @@
 <template>
   <view class="page-settings page-enter">
     <!-- 用户信息 -->
-    <view class="user-card slide-up">
+    <view class="user-card slide-up tap-shrink" @tap="goRoleSetting">
       <view class="avatar" :style="{ background: '#FFF0F0' }">
         <image v-if="avatarUrl" :src="avatarUrl" mode="aspectFill" class="avatar-img" />
         <u-icon v-else name="account-fill" :size="42" color="#FF7B7B" />
@@ -10,13 +10,13 @@
         <text class="user-name">{{ nickName }}</text>
         <text class="user-desc">守护宝宝的每一天</text>
       </view>
-      <view class="user-badge">
-        <text class="badge-text">守护者</text>
+      <view class="user-badge" :class="{ 'has-role': userRelation }">
+        <text class="badge-text">{{ userRelation ? relationName : '守护者' }}</text>
       </view>
     </view>
 
     <!-- 配额信息 -->
-    <view class="section slide-up" style="animation-delay: 0.06s">
+    <view class="section slide-up" style="animation-delay: 0.09s">
       <view class="section-title">提醒配额</view>
       <view class="quota-card tap-shrink" @tap="onSupplementQuota">
         <view class="quota-info">
@@ -117,6 +117,23 @@
         </view>
       </view>
     </view>
+    
+    <!-- 账户设置 -->
+    <view class="section slide-up" style="animation-delay: 0.06s">
+      <view class="section-title">账户设置</view>
+      <view class="menu-list">
+        <view class="menu-item tap-shrink" @tap="goRoleSetting">
+          <view class="menu-icon-wrap role-bg">
+            <u-icon name="man" :size="22" color="#FF7B7B" />
+          </view>
+          <view class="menu-text-wrap">
+            <text class="menu-text">更改角色</text>
+            <text class="menu-sub-text">{{ userRelation ? relationName : '未设置' }}</text>
+          </view>
+          <u-icon name="arrow-right" :size="16" color="#ccc" />
+        </view>
+      </view>
+    </view>
 
     <!-- 关于 -->
     <view class="section slide-up" style="animation-delay: 0.24s">
@@ -157,11 +174,17 @@ import { storeToRefs } from 'pinia';
 import { useUserStore } from '@/stores/user';
 import { useFamilyStore } from '@/stores/family';
 import { guideBatchAuthorization } from '@/utils/subscribe';
+import { FAMILY_RELATION_CONFIG } from '@/utils/constants';
 
 const userStore = useUserStore();
 const familyStore = useFamilyStore();
-const { nickName, avatarUrl, settings, availableQuota } = storeToRefs(userStore);
+const { nickName, avatarUrl, settings, availableQuota, userRelation } = storeToRefs(userStore);
 const { hasFamily, familyName, memberCount } = storeToRefs(familyStore);
+
+const relationName = computed(() => {
+  if (!userRelation.value) return '';
+  return FAMILY_RELATION_CONFIG[userRelation.value]?.name || '';
+});
 
 const pushProxy = computed({
   get: () => settings.value.globalPushEnabled,
@@ -183,6 +206,10 @@ function goAddBaby() {
 
 function goFamily() {
   uni.navigateTo({ url: '/pages/family/index' });
+}
+
+function goRoleSetting() {
+  uni.navigateTo({ url: '/pages/onboarding/role' });
 }
 
 async function onQuietStartChange(e: any) {
@@ -296,6 +323,11 @@ function showFeedback() {
     padding: 8rpx 20rpx;
     background: rgba(255, 255, 255, 0.2);
     border-radius: 999rpx;
+    transition: all 0.3s ease;
+
+    &.has-role {
+      background: rgba(255, 255, 255, 0.35);
+    }
 
     .badge-text {
       font-size: 22rpx;
@@ -415,6 +447,7 @@ function showFeedback() {
 
       &.baby-bg { background: #fff0f0; }
       &.add-bg { background: #e8f2fc; }
+      &.role-bg { background: #fff0f0; }
       &.family-bg { background: #f3e5f5; }
       &.push-bg { background: #fef5e7; }
       &.moon-bg { background: #e8eaf6; }

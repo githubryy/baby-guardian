@@ -152,14 +152,14 @@ export const FAMILY_RELATION_CONFIG: Record<FamilyRelation, {
   bgColor: string;
 }> = {
   father: {
-    name: '爸爸',
+    name: '宝爸',
     shortName: '爸',
     uIcon: 'man',
     color: '#378add',
     bgColor: '#E8F2FC',
   },
   mother: {
-    name: '妈妈',
+    name: '宝妈',
     shortName: '妈',
     uIcon: 'woman',
     color: '#FF7B7B',

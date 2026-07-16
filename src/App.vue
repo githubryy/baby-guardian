@@ -35,6 +35,14 @@ async function initApp() {
     // 3. 登录成功后加载家庭信息
     if (userStore.isLogin) {
       familyStore.loadFamily();
+
+      // 4. 检查是否需要角色引导（新用户未设置身份）
+      if (userStore.needsOnboarding) {
+        console.log('[App] 新用户，跳转角色设置页');
+        setTimeout(() => {
+          uni.navigateTo({ url: '/pages/onboarding/role' });
+        }, 300);
+      }
     }
   } catch (e: any) {
     console.error('[App] 初始化失败:', e);
