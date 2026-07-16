@@ -74,6 +74,9 @@ export type TaskPriority = 'p0' | 'p1' | 'p2';
 /** 窗口跳过策略 */
 export type WindowSkipStrategy = 'delay_to_next_window' | 'skip_and_continue';
 
+/** 事件执行模式 */
+export type TaskMode = 'once' | 'recurring';
+
 /** 提醒事项表 */
 export interface ReminderTask {
   _id: string;
@@ -113,13 +116,19 @@ export interface ReminderTask {
   lockedAt?: string | null;
   /** 优先级 */
   priority: TaskPriority;
+  /** 事件执行模式: once=一次性, recurring=循环执行 */
+  taskMode: TaskMode;
+  /** 循环次数 (-1=无限循环, 仅 taskMode=recurring 时有效) */
+  repeatCount: number;
+  /** 已完成循环次数 (仅 taskMode=recurring 时有效) */
+  completedCount: number;
   createdAt: string;
 }
 
 // ==================== 确认记录 ====================
 
 /** 确认操作类型 */
-export type ConfirmAction = 'completed' | 'delayed' | 'ignored';
+export type ConfirmAction = 'completed' | 'delayed' | 'ignored' | 'paused';
 
 /** 确认日志表 */
 export interface ConfirmLog {
@@ -301,8 +310,8 @@ export interface TimelineItem {
   remindTime: string;
   /** 距上次时长描述 */
   lastDurationText?: string;
-  /** 状态: pending=待处理, completed=已完成, delayed=已延迟, overdue=已超时 */
-  status: 'pending' | 'completed' | 'delayed' | 'overdue';
+  /** 状态: pending=待处理, completed=已完成, delayed=已延迟, overdue=已超时, paused=已结束(永久,不可恢复) */
+  status: 'pending' | 'completed' | 'delayed' | 'overdue' | 'paused';
   priority: TaskPriority;
   /** 完成者信息 */
   completedByName?: string;
@@ -312,6 +321,18 @@ export interface TimelineItem {
   /** 指定负责人 */
   assigneeName?: string;
   assigneeAvatar?: string;
+  /** 事件执行模式 */
+  taskMode?: TaskMode;
+  /** 循环次数 (-1=无限循环) */
+  repeatCount?: number;
+  /** 已完成循环次数 */
+  completedCount?: number;
+  /** 提醒间隔(分钟) - 用于计算下次执行时间 */
+  intervalMinutes?: number;
+  /** 下次提醒时间(ISO) - 循环事件完成后的下次时间 */
+  nextRemindTime?: string;
+  /** 下次执行剩余时间文本 - 云函数计算下发 */
+  nextRemindRemaining?: string;
 }
 
 // ==================== API 通用类型 ====================

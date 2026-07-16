@@ -105,6 +105,7 @@ async function handleAdd(userId, familyId, data) {
     retryCount: 0,
     processingLock: false,
     lockedAt: null,
+    completedCount: data.taskMode === 'recurring' ? 0 : null,
     createdAt: nowIso,
   };
 
@@ -211,10 +212,18 @@ async function handleTimeline(userId, familyId, babyId) {
     const confirmLog = confirmByTask[task._id];
 
     let status = 'pending';
-    if (isConfirmed) {
-      status = 'completed';
-    } else if (remindTime.getTime() < now.getTime()) {
-      status = 'overdue';
+    // 循环事件: 只要未结束，始终视为待处理（不因已确认而标为已完成）
+    const isRecurring = task.taskMode === 'recurring';
+    if (isRecurring) {
+      if (remindTime.getTime() < now.getTime()) {
+        status = 'overdue';
+      }
+    } else {
+      if (isConfirmed) {
+        status = 'completed';
+      } else if (remindTime.getTime() < now.getTime()) {
+        status = 'overdue';
+      }
     }
 
     // 指定负责人信息
@@ -242,6 +251,14 @@ async function handleTimeline(userId, familyId, babyId) {
       // 指定负责人
       assigneeName: assignee?.nickName || null,
       assigneeAvatar: assignee?.avatarUrl || null,
+      // 循环事件相关字段
+      taskMode: task.taskMode || null,
+      repeatCount: task.repeatCount ?? null,
+      completedCount: task.completedCount ?? null,
+      intervalMinutes: task.intervalMinutes ?? null,
+      nextRemindTime: task.nextRemindTime || null,
+      // 下次执行剩余时间（仅循环事件）
+      nextRemindRemaining: isRecurring ? getRemainingText(task.nextRemindTime) : null,
     });
   });
 
@@ -254,4 +271,14 @@ function getDurationText(isoTime) {
   const minutes = Math.floor((diff % 3600000) / 60000);
   if (hours > 0) return `${hours}小时${minutes}分钟`;
   return `${minutes}分钟`;
+}
+
+function getRemainingText(nextRemindTime) {
+  if (!nextRemindTime) return null;
+  const diff = new Date(nextRemindTime).getTime() - Date.now();
+  if (diff <= 0) return '已到';
+  const hours = Math.floor(diff / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+  if (hours > 0) return minutes > 0 ? `剩余${hours}小时${minutes}分钟` : `剩余${hours}小时`;
+  return `剩余${minutes}分钟`;
 }

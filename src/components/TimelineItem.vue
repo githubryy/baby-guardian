@@ -9,14 +9,17 @@
     <!-- 内容卡片 -->
     <view class="content-card tap-shrink" @tap="$emit('item-tap', item)">
       <view class="card-header">
-        <view class="type-icon" :style="{ background: item.typeColor + '18' }">
-          <u-icon :name="taskUIcon" :size="26" :color="item.typeColor" />
+        <view class="type-icon" :style="{ background: safeTypeColor + '18' }">
+          <u-icon :name="taskUIcon" :size="26" :color="safeTypeColor" />
         </view>
         <view class="header-info">
           <text class="type-name">{{ item.typeName }}</text>
           <text v-if="item.customName" class="custom-name">{{ item.customName }}</text>
         </view>
-        <u-tag v-if="statusTag" :text="statusTag" :type="statusTagType" size="mini" shape="circle" />
+        <view class="header-tags">
+          <u-tag v-if="item.taskMode === 'recurring'" text="循环" type="error" size="mini" shape="circle" />
+          <u-tag v-if="statusTag" :text="statusTag" :type="statusTagType" size="mini" shape="circle" />
+        </view>
       </view>
 
       <view class="card-body">
@@ -32,6 +35,19 @@
             <u-icon name="clock" :size="13" color="#bbb" />
             <text class="time-text">{{ timeText }}</text>
           </view>
+        </view>
+
+        <!-- 循环事件: 进度信息 -->
+        <view v-if="item.taskMode === 'recurring' && recurringProgressText" class="recurring-progress-row">
+          <u-icon name="reload" :size="13" color="#ff7b7b" />
+          <text class="recurring-progress-text">{{ recurringProgressText }}</text>
+        </view>
+
+        <!-- 循环事件: 下次执行时间 -->
+        <view v-if="item.taskMode === 'recurring' && nextRemindTimeDisplay" class="next-remind-row">
+          <u-icon name="reload" :size="13" color="#ff7b7b" />
+          <text class="next-remind-label">下次执行</text>
+          <text class="next-remind-remaining">{{ item.nextRemindRemaining }}</text>
         </view>
 
         <!-- 完成者信息（家庭协作） -->
@@ -90,8 +106,36 @@ defineEmits<{
 
 const timeText = computed(() => formatTime(props.item.remindTime));
 
+const safeTypeColor = computed(() => props.item.typeColor || '#999');
+
 const taskUIcon = computed(() => {
   return TASK_TYPE_CONFIG[props.item.type]?.uIcon || 'edit-pen';
+});
+
+// 循环进度文本
+const recurringProgressText = computed(() => {
+  if (!props.item.taskMode || props.item.taskMode !== 'recurring') return '';
+  const count = props.item.completedCount ?? 0;
+  const repeat = props.item.repeatCount;
+  if (repeat === -1) return `第${count}次`;
+  return `第${count}/${repeat}次`;
+});
+
+// 下次提醒时间显示
+const nextRemindTimeDisplay = computed(() => {
+  const nextTime = props.item.nextRemindTime;
+  if (!nextTime) {
+    // 如果没有 nextRemindTime，根据 remindTime + intervalMinutes 推算
+    if (props.item.intervalMinutes && props.item.remindTime) {
+      const remindDate = new Date(props.item.remindTime);
+      if (!isNaN(remindDate.getTime())) {
+        const next = new Date(remindDate.getTime() + props.item.intervalMinutes * 60 * 1000);
+        return formatTime(next.toISOString());
+      }
+    }
+    return '';
+  }
+  return formatTime(nextTime);
 });
 
 const statusTag = computed(() => {
@@ -100,16 +144,18 @@ const statusTag = computed(() => {
     completed: '已完成',
     delayed: '已延迟',
     overdue: '已超时',
+    paused: '已结束',
   };
   return map[props.item.status];
 });
 
-const statusTagType = computed<'success' | 'warning' | 'error'>(() => {
+const statusTagType = computed<'success' | 'warning' | 'error' | 'primary'>(() => {
   const map = {
     completed: 'success' as const,
     delayed: 'warning' as const,
     overdue: 'error' as const,
     pending: 'success' as const,
+    paused: 'primary' as const,
   };
   return map[props.item.status];
 });
@@ -118,7 +164,8 @@ const dotColor = computed(() => {
   if (props.item.status === 'overdue') return '#e24b4a';
   if (props.item.status === 'completed') return '#1d9e75';
   if (props.item.status === 'delayed') return '#ef9f27';
-  return props.item.typeColor;
+  if (props.item.status === 'paused') return '#7f77dd';
+  return safeTypeColor.value;
 });
 
 // 家庭身份辅助函数
@@ -185,7 +232,13 @@ function getRelationBg(relation?: FamilyRelation) {
     margin-bottom: 0;
     box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.05);
     border: 1rpx solid #f5f5f5;
+    position: relative;
+    overflow: hidden;
   }
+
+
+
+    /* 循环进度信息 */
 
   .card-header {
     display: flex;
@@ -220,6 +273,13 @@ function getRelationBg(relation?: FamilyRelation) {
         color: #aaa;
         margin-top: 2rpx;
       }
+    }
+
+    .header-tags {
+      display: flex;
+      align-items: center;
+      gap: 10rpx;
+      flex-shrink: 0;
     }
   }
 
@@ -256,6 +316,49 @@ function getRelationBg(relation?: FamilyRelation) {
           font-weight: 500;
           font-variant-numeric: tabular-nums;
         }
+      }
+    }
+
+    /* 下次执行时间 */
+    .next-remind-row {
+      display: flex;
+      align-items: center;
+      gap: 8rpx;
+      margin-top: 12rpx;
+      padding: 8rpx 16rpx;
+      background: #fff5f5;
+      border-radius: 12rpx;
+      border: 1rpx solid #ffe0e0;
+
+      .next-remind-label {
+        font-size: 22rpx;
+        color: #ff7b7b;
+      }
+
+      .next-remind-remaining {
+         font-size: 24rpx;
+        color: #ff7b7b;
+        font-weight: 600;
+        margin-left: auto;
+      }
+    }
+
+    /* 循环进度信息 */
+    .recurring-progress-row {
+      display: flex;
+      align-items: center;
+      gap: 8rpx;
+      margin-top: 12rpx;
+      padding: 8rpx 16rpx;
+      background: #fff5f5;
+      border-radius: 12rpx;
+      border: 1rpx solid #ffe0e0;
+
+      .recurring-progress-text {
+        font-size: 24rpx;
+        color: #ff7b7b;
+        font-weight: 600;
+        margin-left: auto;
       }
     }
 
@@ -380,6 +483,13 @@ function getRelationBg(relation?: FamilyRelation) {
   &.delayed {
     .content-card {
       border-left: 6rpx solid #ef9f27;
+    }
+  }
+
+  &.paused {
+    .content-card {
+      border-left: 6rpx solid #7f77dd;
+      opacity: 0.7;
     }
   }
 }

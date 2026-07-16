@@ -3,7 +3,7 @@
  */
 import { CLOUD_FUNCTIONS } from '@/utils/constants';
 import { callCloud } from '@/utils/request';
-import type { ReminderTask, TaskType, TaskPriority, WindowSkipStrategy, TimelineItem } from '@/types';
+import type { ReminderTask, TaskType, TaskPriority, WindowSkipStrategy, TaskMode, TimelineItem } from '@/types';
 
 /** 获取事项列表 */
 export function getTaskList(babyId?: string): Promise<ReminderTask[]> {
@@ -26,6 +26,8 @@ export function addTask(data: {
   reminderWindowEnd: string;
   windowSkipStrategy: WindowSkipStrategy;
   priority: TaskPriority;
+  taskMode: TaskMode;
+  repeatCount: number;
 }): Promise<ReminderTask> {
   return callCloud<ReminderTask>(CLOUD_FUNCTIONS.TASK, { action: 'add', data });
 }

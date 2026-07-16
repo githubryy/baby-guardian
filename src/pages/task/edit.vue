@@ -6,16 +6,21 @@
         <text class="form-label">事项类型</text>
         <view class="type-grid">
           <view v-for="opt in TASK_TYPE_OPTIONS" :key="opt.value" class="type-option"
-            :class="{ active: form.type === opt.value, disabled: isEdit }"
+            :class="{ active: form.type === opt.value, disabled: isTypeDisabled(opt.value) }"
             :style="form.type === opt.value ? { borderColor: opt.color, background: opt.color + '10' } : {}"
             @tap="onSelectType(opt.value)">
             <view class="type-icon-box" :style="{ background: opt.color + '15' }">
-              <u-icon :name="opt.icon" :size="16" :color="opt.color" />
+              <u-icon :name="opt.icon" :size="16" :color="isTypeDisabled(opt.value) ? '#ccc' : opt.color" />
             </view>
-            <text class="type-name" :style="{ color: form.type === opt.value ? opt.color : '#666' }">
+            <text class="type-name" :style="{ color: isTypeDisabled(opt.value) ? '#ccc' : (form.type === opt.value ? opt.color : '#666') }">
               {{ opt.label }}
             </text>
+            <text v-if="isTypeDisabled(opt.value)" class="type-exists-tag">已存在</text>
           </view>
+        </view>
+        <view class="form-hint-row">
+          <u-icon name="info-circle" :size="13" color="#aaa" />
+          <text class="form-hint">已有提醒的类型不可重复添加</text>
         </view>
       </view>
 
@@ -40,6 +45,54 @@
         <view class="form-hint-row">
           <u-icon name="info-circle" :size="13" color="#aaa" />
           <text class="form-hint">{{ priorityHint }}</text>
+        </view>
+      </view>
+
+      <!-- 事件模式 -->
+      <view class="form-item">
+        <text class="form-label">事件模式</text>
+        <view class="mode-row">
+          <view class="mode-option" :class="{ active: form.taskMode === 'once' }"
+            @tap="form.taskMode = 'once'">
+            <view class="mode-radio" :class="{ checked: form.taskMode === 'once' }">
+              <view v-if="form.taskMode === 'once'" class="mode-radio-dot" />
+            </view>
+            <view class="mode-content">
+              <text class="mode-name">一次性事件</text>
+              <text class="mode-desc">完成后即结束</text>
+            </view>
+          </view>
+          <view class="mode-option" :class="{ active: form.taskMode === 'recurring' }"
+            @tap="form.taskMode = 'recurring'">
+            <view class="mode-radio" :class="{ checked: form.taskMode === 'recurring' }">
+              <view v-if="form.taskMode === 'recurring'" class="mode-radio-dot" />
+            </view>
+            <view class="mode-content">
+              <text class="mode-name">循环执行事件</text>
+              <text class="mode-desc">按间隔不断生成提醒</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 循环配置 -->
+      <view v-if="form.taskMode === 'recurring'" class="form-item">
+        <text class="form-label">循环次数</text>
+        <view class="repeat-row">
+          <view class="repeat-option" :class="{ active: isInfiniteLoop }"
+            @tap="form.repeatCount = -1">
+            <text>无限循环</text>
+          </view>
+          <view class="repeat-option" :class="{ active: !isInfiniteLoop }"
+            @tap="form.repeatCount = form.repeatCount <= 0 ? 3 : form.repeatCount">
+            <text>指定次数</text>
+          </view>
+        </view>
+        <view v-if="!isInfiniteLoop" class="repeat-input-row">
+          <text class="repeat-label">执行</text>
+          <u-input v-model="repeatCountStr" type="number" placeholder="次数" border="surround"
+            :customStyle="{ width: '160rpx', textAlign: 'center' }" />
+          <text class="repeat-label">次后完成</text>
         </view>
       </view>
 
@@ -137,7 +190,8 @@ import { onLoad } from '@dcloudio/uni-app';
 import { useTaskStore } from '@/stores/task';
 import { useBabyStore } from '@/stores/baby';
 import { TASK_TYPE_OPTIONS, PRIORITY_OPTIONS, TASK_TYPE_CONFIG, DEFAULT_WINDOW } from '@/utils/constants';
-import type { TaskType, TaskPriority, WindowSkipStrategy } from '@/types';
+import { guideBatchAuthorization } from '@/utils/subscribe';
+import type { TaskType, TaskPriority, WindowSkipStrategy, TaskMode } from '@/types';
 
 const taskStore = useTaskStore();
 const babyStore = useBabyStore();
@@ -156,6 +210,8 @@ const form = ref({
   reminderWindowEnd: DEFAULT_WINDOW.end,
   windowSkipStrategy: 'delay_to_next_window' as WindowSkipStrategy,
   priority: 'p1' as TaskPriority,
+  taskMode: 'once' as TaskMode,
+  repeatCount: -1,
 });
 
 const intervalPresets = [
@@ -172,6 +228,39 @@ const priorityHint = computed(() => {
   if (form.value.priority === 'p0') return '紧急事项，使用订阅消息推送';
   if (form.value.priority === 'p1') return '重要事项，使用订阅消息推送';
   return '普通事项，使用小程序内通知（不消耗配额）';
+});
+
+// 已存在活跃事项的类型集合（防止重复添加）
+const activeTaskTypes = computed(() => {
+  if (isEdit.value) return new Set<TaskType>(); // 编辑模式下不限制
+  const babyId = babyStore.currentBabyId;
+  return new Set(
+    taskStore.taskList
+      .filter((t) => t.babyId === babyId && t.enabled)
+      .map((t) => t.type)
+  );
+});
+
+function isTypeDisabled(type: TaskType): boolean {
+  if (isEdit.value) return true; // 编辑模式全部禁用
+  return activeTaskTypes.value.has(type);
+}
+
+// 是否无限循环
+const isInfiniteLoop = computed(() => form.value.repeatCount === -1);
+
+// 循环次数显示字符串
+const repeatCountStr = computed({
+  get: () => {
+    if (form.value.repeatCount <= 0) return '';
+    return String(form.value.repeatCount);
+  },
+  set: (val: string) => {
+    const n = Number(val);
+    if (n > 0) {
+      form.value.repeatCount = Math.min(n, 999);
+    }
+  },
 });
 
 watch(() => form.value.type, (newType) => {
@@ -202,6 +291,8 @@ function loadTaskDetail() {
       reminderWindowEnd: task.reminderWindowEnd,
       windowSkipStrategy: task.windowSkipStrategy,
       priority: task.priority,
+      taskMode: task.taskMode || 'once',
+      repeatCount: task.repeatCount ?? -1,
     };
     uni.setNavigationBarTitle({ title: '编辑事项' });
   }
@@ -209,6 +300,10 @@ function loadTaskDetail() {
 
 function onSelectType(type: TaskType) {
   if (isEdit.value) return;
+  if (isTypeDisabled(type)) {
+    uni.showToast({ title: '该类型已有活跃提醒，不可重复添加', icon: 'none' });
+    return;
+  }
   form.value.type = type;
 }
 
@@ -243,6 +338,8 @@ async function onSave() {
       reminderWindowEnd: form.value.reminderWindowEnd,
       windowSkipStrategy: form.value.windowSkipStrategy,
       priority: form.value.priority,
+      taskMode: form.value.taskMode,
+      repeatCount: form.value.taskMode === 'recurring' ? form.value.repeatCount : -1,
     };
 
     if (isEdit.value) {
@@ -254,8 +351,7 @@ async function onSave() {
     } else {
       const ok = await taskStore.addTask(data);
       if (ok) {
-        const { guideBatchAuthorization } = await import('@/utils/subscribe');
-        await guideBatchAuthorization('添加事项后');
+        guideBatchAuthorization('添加事项后');
         setTimeout(() => uni.navigateBack(), 600);
       }
     }
@@ -369,8 +465,18 @@ async function onDelete() {
     }
 
     &.disabled {
-      opacity: 0.5;
+      opacity: 0.45;
+      pointer-events: none;
     }
+  }
+
+  .type-exists-tag {
+    font-size: 18rpx;
+    color: #ccc;
+    background: #f0f0f0;
+    padding: 2rpx 10rpx;
+    border-radius: 6rpx;
+    margin-top: 2rpx;
   }
 }
 
@@ -391,6 +497,107 @@ async function onDelete() {
     &.active {
       font-weight: 600;
     }
+  }
+}
+
+// 事件模式
+.mode-row {
+  display: flex;
+  gap: 16rpx;
+
+  .mode-option {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    gap: 16rpx;
+    padding: 24rpx;
+    background: #f5f5f5;
+    border-radius: 16rpx;
+    border: 2rpx solid transparent;
+    transition: all 0.2s ease;
+
+    &.active {
+      background: #fff0f0;
+      border-color: #ff7b7b;
+    }
+
+    .mode-radio {
+      width: 40rpx;
+      height: 40rpx;
+      border-radius: 50%;
+      border: 2rpx solid #ccc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2rpx;
+
+      &.checked {
+        border-color: #ff7b7b;
+      }
+
+      .mode-radio-dot {
+        width: 22rpx;
+        height: 22rpx;
+        border-radius: 50%;
+        background: #ff7b7b;
+      }
+    }
+
+    .mode-content {
+      display: flex;
+      flex-direction: column;
+
+      .mode-name {
+        font-size: 28rpx;
+        color: #2d2d2d;
+        font-weight: 500;
+      }
+
+      .mode-desc {
+        font-size: 22rpx;
+        color: #999;
+        margin-top: 4rpx;
+      }
+    }
+  }
+}
+
+// 循环次数
+.repeat-row {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+
+  .repeat-option {
+    flex: 1;
+    text-align: center;
+    padding: 16rpx 0;
+    background: #f5f5f5;
+    border-radius: 12rpx;
+    border: 2rpx solid transparent;
+    font-size: 28rpx;
+    color: #666;
+
+    &.active {
+      background: #fff0f0;
+      border-color: #ff7b7b;
+      color: #ff7b7b;
+      font-weight: 600;
+    }
+  }
+}
+
+.repeat-input-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+
+  .repeat-label {
+    font-size: 26rpx;
+    color: #666;
+    white-space: nowrap;
   }
 }
 

@@ -1,7 +1,7 @@
 <template>
   <view class="page-confirm">
     <!-- 事项信息卡片 -->
-    <view class="task-card slide-up">
+    <view v-if="task" class="task-card slide-up">
       <view class="task-type" :style="{ background: typeConfig.bgColor }">
         <view class="type-icon-wrap" :style="{ background: typeConfig.color }">
           <u-icon :name="typeConfig.uIcon" :size="28" color="#fff" />
@@ -16,6 +16,15 @@
             <text class="info-label">宝宝</text>
           </view>
           <text class="info-value">{{ babyName }}</text>
+        </view>
+        <view class="info-row" v-if="task?.taskMode === 'recurring'">
+          <view class="info-left">
+            <u-icon name="reload" :size="15" color="#aaa" />
+            <text class="info-label">事件模式</text>
+          </view>
+          <text class="info-value" style="color: #ff7b7b">
+            {{ recurringModeText }}
+          </text>
         </view>
         <view class="info-row">
           <view class="info-left">
@@ -55,7 +64,7 @@
           </view>
           <view class="action-text">
             <text class="action-name">已完成</text>
-            <text class="action-desc">确认完成本次提醒</text>
+            <text class="action-desc">{{ completeActionDesc }}</text>
           </view>
           <u-icon name="arrow-right" :size="16" color="#ccc" />
         </view>
@@ -80,6 +89,18 @@
           <view class="action-text">
             <text class="action-name">忽略本次</text>
             <text class="action-desc">跳过本次提醒</text>
+          </view>
+          <u-icon name="arrow-right" :size="16" color="#ccc" />
+        </view>
+
+        <!-- 临时结束 -->
+        <view class="action-item pause tap-feedback" @tap="onPause">
+          <view class="action-icon-wrap pause-bg">
+            <u-icon name="pause-circle-fill" :size="28" color="#7f77dd" />
+          </view>
+          <view class="action-text">
+            <text class="action-name">临时结束</text>
+            <text class="action-desc">永久结束该事件，不可恢复</text>
           </view>
           <u-icon name="arrow-right" :size="16" color="#ccc" />
         </view>
@@ -183,6 +204,23 @@ const lastCompletedByText = computed(() => {
   return task.value.lastCompletedByName;
 });
 
+// 循环模式显示文本
+const recurringModeText = computed(() => {
+  const t = task.value;
+  if (!t || t.taskMode !== 'recurring') return '';
+  const count = t.completedCount || 0;
+  if (t.repeatCount === -1) return `循环执行 · 第 ${count} 次`;
+  return `循环执行 · 第 ${count}/${t.repeatCount} 次`;
+});
+
+// 完成操作描述（循环事件显示下次执行时间）
+const completeActionDesc = computed(() => {
+  if (task.value?.taskMode !== 'recurring') return '确认完成本次提醒';
+  const nextTime = getNextRemindTime();
+  if (nextTime) return `完成后下次提醒: ${nextTime}`;
+  return '确认完成本次循环提醒';
+});
+
 function getRelationShortName(relation?: FamilyRelation): string {
   if (!relation) return '';
   return FAMILY_RELATION_CONFIG[relation]?.shortName || '';
@@ -205,13 +243,35 @@ async function onComplete() {
     if (ok) {
       await guideBatchAuthorization('完成确认后');
       userStore.refreshQuota();
-      uni.showToast({ title: '已完成', icon: 'success' });
+      // 循环事件: 提示下次执行时间
+      if (task.value?.taskMode === 'recurring') {
+        const nextTime = getNextRemindTime();
+        if (nextTime) {
+          uni.showToast({ title: `已完成，下次 ${nextTime}`, icon: 'success', duration: 2500 });
+        } else {
+          uni.showToast({ title: '已完成', icon: 'success' });
+        }
+      } else {
+        uni.showToast({ title: '已完成', icon: 'success' });
+      }
       setTimeout(() => uni.navigateBack(), 800);
     }
   } finally {
     submitting.value = false;
     uni.hideLoading();
   }
+}
+
+// 计算下次提醒时间(用于toast提示)
+function getNextRemindTime(): string {
+  const t = task.value;
+  if (!t || t.taskMode !== 'recurring' || !t.intervalMinutes) return '';
+  const remindDate = new Date(t.nextRemindTime);
+  if (isNaN(remindDate.getTime())) return '';
+  const next = new Date(remindDate.getTime() + t.intervalMinutes * 60 * 1000);
+  const hh = String(next.getHours()).padStart(2, '0');
+  const mm = String(next.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
 }
 
 function onDelay() {
@@ -256,6 +316,34 @@ async function onIgnore() {
             action: 'ignored',
           });
           if (ok) uni.navigateBack();
+        } finally {
+          submitting.value = false;
+          uni.hideLoading();
+        }
+      }
+    },
+  });
+}
+
+async function onPause() {
+  if (submitting.value) return;
+  uni.showModal({
+    title: '确认结束',
+    content: '结束后该事件将永久停用，不可恢复。若需要该类型的提醒，需要重新添加。确定要结束吗？',
+    confirmColor: '#e24b4a',
+    success: async (res) => {
+      if (res.confirm) {
+        submitting.value = true;
+        uni.showLoading({ title: '处理中...' });
+        try {
+          const ok = await taskStore.confirmTask({
+            taskId: taskId.value,
+            action: 'paused',
+          });
+          if (ok) {
+            uni.showToast({ title: '事件已结束，需重新添加才能恢复', icon: 'none', duration: 2000 });
+            setTimeout(() => uni.navigateBack(), 1000);
+          }
         } finally {
           submitting.value = false;
           uni.hideLoading();
@@ -404,6 +492,11 @@ async function onSupplementQuota() {
         border-color: rgba(29, 158, 117, 0.15);
       }
 
+      &.pause {
+        background: #f3f0fc;
+        border-color: rgba(127, 119, 221, 0.15);
+      }
+
       .action-icon-wrap {
         width: 80rpx;
         height: 80rpx;
@@ -424,6 +517,10 @@ async function onSupplementQuota() {
 
         &.ignore-bg {
           background: #f0f0f0;
+        }
+
+        &.pause-bg {
+          background: linear-gradient(135deg, #f3f0fc, #e8e4f8);
         }
       }
 

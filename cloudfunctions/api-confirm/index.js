@@ -68,18 +68,25 @@ async function handleConfirm(userId, familyId, currentUser, data) {
     // 完成: 重置重试次数，计算下次提醒时间，记录完成者
     const nextRemind = new Date();
     nextRemind.setMinutes(nextRemind.getMinutes() + task.intervalMinutes);
-    await db.collection('reminder_tasks').doc(taskId).update({
-      data: {
-        lastCompletedTime: now,
-        lastCompletedBy: userId,
-        lastCompletedByName: currentUser.nickName,
-        lastCompletedByRelation: currentUser.relation || 'other',
-        nextRemindTime: nextRemind.toISOString(),
-        retryCount: 0,
-        processingLock: false,
-        lockedAt: null,
-      },
-    });
+    const updateData = {
+      lastCompletedTime: now,
+      lastCompletedBy: userId,
+      lastCompletedByName: currentUser.nickName,
+      lastCompletedByRelation: currentUser.relation || 'other',
+      nextRemindTime: nextRemind.toISOString(),
+      retryCount: 0,
+      processingLock: false,
+      lockedAt: null,
+    };
+    // 循环事件: 递增 completedCount
+    if (task.taskMode === 'recurring') {
+      updateData.completedCount = (task.completedCount || 0) + 1;
+      // 有限循环且已完成全部次数 → 自动停用
+      if (task.repeatCount > 0 && updateData.completedCount >= task.repeatCount) {
+        updateData.enabled = false;
+      }
+    }
+    await db.collection('reminder_tasks').doc(taskId).update({ data: updateData });
   } else if (action === 'delayed') {
     // 延迟: 推迟到指定时间后
     const nextRemind = new Date();
@@ -99,6 +106,15 @@ async function handleConfirm(userId, familyId, currentUser, data) {
       data: {
         nextRemindTime: nextRemind.toISOString(),
         retryCount: 0,
+        processingLock: false,
+        lockedAt: null,
+      },
+    });
+  } else if (action === 'paused') {
+    // 临时结束: 永久停用该事项，不可恢复，只能重新发起
+    await db.collection('reminder_tasks').doc(taskId).update({
+      data: {
+        enabled: false,
         processingLock: false,
         lockedAt: null,
       },
