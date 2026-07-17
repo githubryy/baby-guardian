@@ -26,6 +26,20 @@ function getOpenId(event) {
   return event.userInfo?.openId || cloud.getWXContext().OPENID;
 }
 
+/** 生产环境 ID（需替换为实际的云环境 ID） */
+const PROD_ENV_ID = 'cloudbase-d8g1n7nag24fc86c3';
+
+/**
+ * 根据当前云环境自动判断 miniprogramState
+ * - 生产环境 → 'formal'  (已上线小程序)
+ * - 开发/测试环境 → 'developer'  (开发版)
+ * - 如需体验版用 'trial'，可将第二个值改为 'trial'
+ */
+function getMiniProgramState() {
+  const currentEnv = cloud.getWXContext().ENV;
+  return currentEnv === PROD_ENV_ID ? 'formal' : 'developer';
+}
+
 /** 生成 UTC 时间 */
 function nowISO() {
   return new Date().toISOString();
@@ -83,6 +97,7 @@ module.exports = {
   success,
   fail,
   getOpenId,
+  getMiniProgramState,
   nowISO,
   beijingTimeToDate,
   isWithinWindow,
