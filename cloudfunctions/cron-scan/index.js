@@ -7,29 +7,39 @@
  * P1: 重试策略 — 首次用订阅消息, 重试用小程序内通知(红点)
  * P2: 优先级分层 — P0/P1 用订阅消息, P2 仅红点
  */
-const { cloud, db, _, success, fail, nowISO, isWithinWindow, getNextWindowStart, getMiniProgramState } = require('./utils');
+const {
+  cloud,
+  db,
+  _,
+  success,
+  fail,
+  nowISO,
+  isWithinWindow,
+  getNextWindowStart,
+  getMiniProgramState,
+} = require("./utils");
 
 const BATCH_LIMIT = 50;
 const LOCK_TIMEOUT_MINUTES = 5;
 
 // 订阅消息模板ID (需与微信公众平台申请的一致)
 const TEMPLATES = {
-  feeding:   'cJTFLqrWfBPcHGmBsMiVp86CZ5Tf4Gl9oAHIWKtcLaQ',
-  care:      'WvNgDqkdCzyJuTeirnpFjNDX3oVYJ7wLmGuK8hJbVu4',
-  medicine:  'Iqg9G1yjGeuWB4NZ9C6xbQa9hbvn_IRn8B2gezTcElw',
+  feeding: "cJTFLqrWfBPcHGmBsMiVp86CZ5Tf4Gl9oAHIWKtcLaQ",
+  care: "WvNgDqkdCzyJuTeirnpFjNDX3oVYJ7wLmGuK8hJbVu4",
+  medicine: "Iqg9G1yjGeuWB4NZ9C6xbQa9hbvn_IRn8B2gezTcElw",
 };
 
 // 模板与事项类型映射
 const TYPE_TEMPLATE_MAP = {
-  feeding: 'feeding',
-  diaper: 'care',
-  sleep: 'care',
-  vitamin: 'medicine',
-  medicine: 'medicine',
+  feeding: "feeding",
+  diaper: "care",
+  sleep: "care",
+  vitamin: "medicine",
+  medicine: "medicine",
 };
 
 exports.main = async (event, context) => {
-  console.log('[cron-scan] 开始扫描', new Date().toISOString());
+  console.log("[cron-scan] 开始扫描", new Date().toISOString());
   const startTime = Date.now();
   let processed = 0;
   let pushed = 0;
@@ -44,142 +54,202 @@ exports.main = async (event, context) => {
     await unlockStaleTasks(now);
 
     // 2. 查询到期事项 (最多 BATCH_LIMIT 条, 未锁定)
-    const { data: tasks } = await db.collection('reminder_tasks')
+    const { data: tasks } = await db
+      .collection("reminder_tasks")
       .where({
         enabled: true,
         nextRemindTime: _.lte(now.toISOString()),
         processingLock: false,
       })
-      .orderBy('nextRemindTime', 'asc')
+      .orderBy("nextRemindTime", "asc")
       .limit(BATCH_LIMIT)
       .get();
 
     if (tasks.length === 0) {
-      console.log('[cron-scan] 无到期事项');
-      return success({ processed: 0, message: '无到期事项' });
+      console.log("[cron-scan] 无到期事项");
+      return success({ processed: 0, message: "无到期事项" });
     }
 
     console.log(`[cron-scan] 找到 ${tasks.length} 条到期事项`);
 
     // 3. 批量锁定
-    await Promise.all(tasks.map((task) =>
-      db.collection('reminder_tasks').doc(task._id).update({
-        data: { processingLock: true, lockedAt: now.toISOString() },
-      })
-    ));
+    await Promise.all(
+      tasks.map((task) =>
+        db
+          .collection("reminder_tasks")
+          .doc(task._id)
+          .update({
+            data: { processingLock: true, lockedAt: now.toISOString() },
+          }),
+      ),
+    );
 
     // 4. 逐条处理 (使用 allSettled 防止单条失败影响整体)
-    const results = await Promise.allSettled(tasks.map(async (task) => {
-      processed++;
+    const results = await Promise.allSettled(
+      tasks.map(async (task) => {
+        processed++;
 
-      // 4a. 检查提醒窗口
-      if (!isWithinWindow(now, task.reminderWindowStart, task.reminderWindowEnd)) {
-        console.log(`[cron-scan] 事项 ${task._id} 不在提醒窗口内`);
-        windowSkipped++;
+        // 4a. 检查提醒窗口
+        if (
+          !isWithinWindow(now, task.reminderWindowStart, task.reminderWindowEnd)
+        ) {
+          console.log(`[cron-scan] 事项 ${task._id} 不在提醒窗口内`);
+          windowSkipped++;
 
-        // 根据策略处理
-        if (task.windowSkipStrategy === 'delay_to_next_window') {
-          const nextStart = getNextWindowStart(task.reminderWindowStart);
-          await db.collection('reminder_tasks').doc(task._id).update({
-            data: { nextRemindTime: nextStart.toISOString() },
-          });
-        } else {
-          // skip_and_continue: 直接计算下一个间隔
-          const nextTime = new Date(now.getTime() + task.intervalMinutes * 60 * 1000);
-          await db.collection('reminder_tasks').doc(task._id).update({
-            data: { nextRemindTime: nextTime.toISOString() },
-          });
+          // 根据策略处理
+          if (task.windowSkipStrategy === "delay_to_next_window") {
+            const nextStart = getNextWindowStart(task.reminderWindowStart);
+            await db
+              .collection("reminder_tasks")
+              .doc(task._id)
+              .update({
+                data: { nextRemindTime: nextStart.toISOString() },
+              });
+          } else {
+            // skip_and_continue: 直接计算下一个间隔
+            const nextTime = new Date(
+              now.getTime() + task.intervalMinutes * 60 * 1000,
+            );
+            await db
+              .collection("reminder_tasks")
+              .doc(task._id)
+              .update({
+                data: { nextRemindTime: nextTime.toISOString() },
+              });
+          }
+          return;
         }
-        return;
-      }
 
-      // 4b. P2 优先级事项 — 仅红点通知，不消耗配额
-      if (task.priority === 'p2') {
-        console.log(`[cron-scan] 事项 ${task._id} 为P2优先级，仅红点通知`);
-        // 计算下次提醒时间
-        const nextTime = new Date(now.getTime() + task.intervalMinutes * 60 * 1000);
-        await db.collection('reminder_tasks').doc(task._id).update({
-          data: {
-            nextRemindTime: nextTime.toISOString(),
-            retryCount: 0,
-          },
-        });
-        // 记录日志
-        await logNotification(task, null, 'success', null, 0, 'red_dot_only');
-        return;
-      }
-
-      // 4c. P0/P1 优先级 — 使用订阅消息推送
-
-      // 重试策略: retryCount > 0 时降级为红点通知
-      if (task.retryCount > 0) {
-        console.log(`[cron-scan] 事项 ${task._id} 第${task.retryCount}次重试，降级为红点`);
-        const nextTime = new Date(now.getTime() + task.intervalMinutes * 60 * 1000);
-        await db.collection('reminder_tasks').doc(task._id).update({
-          data: {
-            nextRemindTime: nextTime.toISOString(),
-            retryCount: task.retryCount + 1,
-          },
-        });
-        await logNotification(task, null, 'success', null, task.retryCount, 'red_dot_retry');
-        return;
-      }
-
-      // 4d. 获取家庭所有成员的配额
-      const familyQuotas = await getFamilyQuotas(task);
-      if (familyQuotas.length === 0) {
-        console.log(`[cron-scan] 事项 ${task._id} 家庭配额不足`);
-        quotaExhausted++;
-        await logNotification(task, null, 'quota_exhausted', null, 0);
-
-        const nextTime = new Date(now.getTime() + 30 * 60 * 1000);
-        await db.collection('reminder_tasks').doc(task._id).update({
-          data: { nextRemindTime: nextTime.toISOString() },
-        });
-        return;
-      }
-
-      // 4e. 向有配额的家庭成员发送订阅消息
-      let anySuccess = false;
-      for (const fq of familyQuotas) {
-        const sendResult = await sendSubscriptionMessage(task, fq);
-        await logNotification(task, fq, sendResult.status, sendResult.error, 0);
-
-        if (sendResult.status === 'success') {
-          pushed++;
-          anySuccess = true;
-          // 消耗配额
-          await consumeQuota(fq.quotaId, task._id);
+        // 4b. P2 优先级事项 — 仅红点通知，不消耗配额
+        if (task.priority === "p2") {
+          console.log(`[cron-scan] 事项 ${task._id} 为P2优先级，仅红点通知`);
+          // 计算下次提醒时间
+          const nextTime = new Date(
+            now.getTime() + task.intervalMinutes * 60 * 1000,
+          );
+          await db
+            .collection("reminder_tasks")
+            .doc(task._id)
+            .update({
+              data: {
+                nextRemindTime: nextTime.toISOString(),
+                retryCount: 0,
+              },
+            });
+          // 记录日志
+          await logNotification(task, null, "success", null, 0, "red_dot_only");
+          return;
         }
-      }
 
-      // 4f. 更新事项: 设置下次提醒时间 + retryCount
-      const nextTime = new Date(now.getTime() + task.intervalMinutes * 60 * 1000);
-      await db.collection('reminder_tasks').doc(task._id).update({
-        data: {
-          nextRemindTime: nextTime.toISOString(),
-          retryCount: 0,
-        },
-      });
-    }));
+        // 4c. P0/P1 优先级 — 使用订阅消息推送
+
+        // 重试策略: retryCount > 0 时降级为红点通知
+        if (task.retryCount > 0) {
+          console.log(
+            `[cron-scan] 事项 ${task._id} 第${task.retryCount}次重试，降级为红点`,
+          );
+          const nextTime = new Date(
+            now.getTime() + task.intervalMinutes * 60 * 1000,
+          );
+          await db
+            .collection("reminder_tasks")
+            .doc(task._id)
+            .update({
+              data: {
+                nextRemindTime: nextTime.toISOString(),
+                retryCount: task.retryCount + 1,
+              },
+            });
+          await logNotification(
+            task,
+            null,
+            "success",
+            null,
+            task.retryCount,
+            "red_dot_retry",
+          );
+          return;
+        }
+
+        // 4d. 获取家庭所有成员的配额
+        const familyQuotas = await getFamilyQuotas(task);
+        if (familyQuotas.length === 0) {
+          console.log(`[cron-scan] 事项 ${task._id} 家庭配额不足`);
+          quotaExhausted++;
+          await logNotification(task, null, "quota_exhausted", null, 0);
+
+          const nextTime = new Date(now.getTime() + 30 * 60 * 1000);
+          await db
+            .collection("reminder_tasks")
+            .doc(task._id)
+            .update({
+              data: { nextRemindTime: nextTime.toISOString() },
+            });
+          return;
+        }
+
+        // 4e. 向有配额的家庭成员发送订阅消息
+        let anySuccess = false;
+        for (const fq of familyQuotas) {
+          const sendResult = await sendSubscriptionMessage(task, fq);
+          await logNotification(
+            task,
+            fq,
+            sendResult.status,
+            sendResult.error,
+            0,
+          );
+
+          if (sendResult.status === "success") {
+            pushed++;
+            anySuccess = true;
+            // 消耗配额
+            await consumeQuota(fq.quotaId, task._id);
+          }
+        }
+
+        // 4f. 更新事项: 设置下次提醒时间 + retryCount
+        const nextTime = new Date(
+          now.getTime() + task.intervalMinutes * 60 * 1000,
+        );
+        await db
+          .collection("reminder_tasks")
+          .doc(task._id)
+          .update({
+            data: {
+              nextRemindTime: nextTime.toISOString(),
+              retryCount: 0,
+            },
+          });
+      }),
+    );
 
     // 统计错误
-    errors = results.filter((r) => r.status === 'rejected').length;
+    errors = results.filter((r) => r.status === "rejected").length;
     if (errors > 0) {
-      results.filter((r) => r.status === 'rejected').forEach((r) => {
-        console.error('[cron-scan] 处理失败:', r.reason);
-      });
+      results
+        .filter((r) => r.status === "rejected")
+        .forEach((r) => {
+          console.error("[cron-scan] 处理失败:", r.reason);
+        });
     }
 
     // 5. 解锁所有处理完的事项
-    await Promise.all(tasks.map((task) =>
-      db.collection('reminder_tasks').doc(task._id).update({
-        data: { processingLock: false, lockedAt: null },
-      })
-    ));
+    await Promise.all(
+      tasks.map((task) =>
+        db
+          .collection("reminder_tasks")
+          .doc(task._id)
+          .update({
+            data: { processingLock: false, lockedAt: null },
+          }),
+      ),
+    );
 
     const duration = Date.now() - startTime;
-    console.log(`[cron-scan] 扫描完成: 处理${processed}条, 推送${pushed}条, 配额不足${quotaExhausted}条, 窗口外${windowSkipped}条, 错误${errors}条, 耗时${duration}ms`);
+    console.log(
+      `[cron-scan] 扫描完成: 处理${processed}条, 推送${pushed}条, 配额不足${quotaExhausted}条, 窗口外${windowSkipped}条, 错误${errors}条, 耗时${duration}ms`,
+    );
 
     return success({
       processed,
@@ -190,8 +260,8 @@ exports.main = async (event, context) => {
       duration,
     });
   } catch (err) {
-    console.error('[cron-scan] 扫描异常:', err);
-    return fail(err.message || '扫描异常');
+    console.error("[cron-scan] 扫描异常:", err);
+    return fail(err.message || "扫描异常");
   }
 };
 
@@ -200,7 +270,8 @@ exports.main = async (event, context) => {
  */
 async function unlockStaleTasks(now) {
   const staleTime = new Date(now.getTime() - LOCK_TIMEOUT_MINUTES * 60 * 1000);
-  await db.collection('reminder_tasks')
+  await db
+    .collection("reminder_tasks")
     .where({
       processingLock: true,
       lockedAt: _.lt(staleTime.toISOString()),
@@ -223,7 +294,8 @@ async function getFamilyQuotas(task) {
 
   // 获取家庭信息
   const familyId = task.familyId || task.userId;
-  const { data: family } = await db.collection('families')
+  const { data: family } = await db
+    .collection("families")
     .doc(familyId)
     .get()
     .catch(() => ({ data: null }));
@@ -231,10 +303,11 @@ async function getFamilyQuotas(task) {
   // 获取家庭所有成员的 userId 和 openId
   let memberUserIds = [task.userId];
   if (family && family.members) {
-    memberUserIds = family.members.map(m => m.userId);
+    memberUserIds = family.members.map((m) => m.userId);
   }
 
-  const { data: memberUsers } = await db.collection('users')
+  const { data: memberUsers } = await db
+    .collection("users")
     .where({ _id: _.in(memberUserIds) })
     .get();
 
@@ -243,14 +316,15 @@ async function getFamilyQuotas(task) {
 
   for (const user of memberUsers) {
     // 查找该成员的可用配额
-    const { data: quotas } = await db.collection('subscription_quotas')
+    const { data: quotas } = await db
+      .collection("subscription_quotas")
       .where({
         openId: user.openId,
         templateId: templateId,
-        status: 'available',
+        status: "available",
         expireAt: _.gt(now),
       })
-      .orderBy('authorizedAt', 'asc')
+      .orderBy("authorizedAt", "asc")
       .limit(1)
       .get();
 
@@ -271,7 +345,7 @@ async function getFamilyQuotas(task) {
  */
 async function sendSubscriptionMessage(task, familyQuota) {
   try {
-    const { data: baby } = await db.collection('babies').doc(task.babyId).get();
+    const { data: baby } = await db.collection("babies").doc(task.babyId).get();
 
     const templateKey = TYPE_TEMPLATE_MAP[task.type];
     const templateId = TEMPLATES[templateKey];
@@ -284,19 +358,30 @@ async function sendSubscriptionMessage(task, familyQuota) {
       templateId,
       data: sendData,
       miniprogramState: getMiniProgramState(),
-      lang: 'zh_CN',
+      lang: "zh_CN",
     });
 
     if (result.errCode === 0) {
-      console.log(`[cron-scan] 推送成功: 事项 ${task._id} → ${familyQuota.user.nickName}`);
-      return { status: 'success', error: null };
+      console.log(
+        `[cron-scan] 推送成功: 事项 ${task._id} → ${familyQuota.user.nickName}`,
+      );
+      return { status: "success", error: null };
     } else {
-      console.error(`[cron-scan] 推送失败: 事项 ${task._id} → ${familyQuota.openId}`, result);
-      return { status: 'failed', error: { code: result.errCode, message: result.errMsg } };
+      console.error(
+        `[cron-scan] 推送失败: 事项 ${task._id} → ${familyQuota.openId}`,
+        result,
+      );
+      return {
+        status: "failed",
+        error: { code: result.errCode, message: result.errMsg },
+      };
     }
   } catch (err) {
     console.error(`[cron-scan] 推送异常: 事项 ${task._id}`, err);
-    return { status: 'failed', error: { code: err.errCode, message: err.errMsg } };
+    return {
+      status: "failed",
+      error: { code: err.errCode, message: err.errMsg },
+    };
   }
 }
 
@@ -307,36 +392,36 @@ async function sendSubscriptionMessage(task, familyQuota) {
 function buildMessageData(task, baby, templateKey) {
   const now = new Date();
   const beijingTime = new Date(now.getTime() + 8 * 3600 * 1000);
-  const timeStr = `${String(beijingTime.getUTCHours()).padStart(2, '0')}:${String(beijingTime.getUTCMinutes()).padStart(2, '0')}`;
-  const babyName = baby?.name || '宝宝';
-  const taskName = task.customName || '';
+  const timeStr = `${String(beijingTime.getUTCHours()).padStart(2, "0")}:${String(beijingTime.getUTCMinutes()).padStart(2, "0")}`;
+  const babyName = baby?.name || "宝宝";
+  const taskName = task.customName || "";
 
   switch (templateKey) {
-    case 'feeding':
+    case "feeding":
       // 模板A: 喂养提醒 — 宝宝昵称、事项类型、距上次时长、提醒时间
       return {
         thing1: { value: babyName },
-        thing2: { value: '喂养' },
+        thing2: { value: "喂养" },
         time3: { value: timeStr },
       };
-    case 'care':
+    case "care":
       // 模板B: 护理提醒 — 宝宝昵称、事项类型、提醒时间
       return {
         thing1: { value: babyName },
-        thing2: { value: taskName || '护理' },
+        thing2: { value: taskName || "护理" },
         time3: { value: timeStr },
       };
-    case 'medicine':
+    case "medicine":
       // 模板C: 用药提醒 — 宝宝昵称、药品名称、用量、提醒时间
       return {
         thing1: { value: babyName },
-        thing2: { value: taskName || '用药' },
+        thing2: { value: taskName || "用药" },
         time3: { value: timeStr },
       };
     default:
       return {
         thing1: { value: babyName },
-        thing2: { value: '提醒' },
+        thing2: { value: "提醒" },
         time3: { value: timeStr },
       };
   }
@@ -346,28 +431,38 @@ function buildMessageData(task, baby, templateKey) {
  * 消耗配额
  */
 async function consumeQuota(quotaId, taskId) {
-  await db.collection('subscription_quotas').doc(quotaId).update({
-    data: {
-      status: 'consumed',
-      consumedAt: nowISO(),
-      consumedByTaskId: taskId,
-    },
-  });
+  await db
+    .collection("subscription_quotas")
+    .doc(quotaId)
+    .update({
+      data: {
+        status: "consumed",
+        consumedAt: nowISO(),
+        consumedByTaskId: taskId,
+      },
+    });
 }
 
 /**
  * 记录推送日志
  */
-async function logNotification(task, familyQuota, status, error, retryRound, method = 'subscribe') {
-  const openId = familyQuota?.openId || '';
+async function logNotification(
+  task,
+  familyQuota,
+  status,
+  error,
+  retryRound,
+  method = "subscribe",
+) {
+  const openId = familyQuota?.openId || "";
   const quotaId = familyQuota?.quotaId || null;
 
-  await db.collection('notification_logs').add({
+  await db.collection("notification_logs").add({
     data: {
       taskId: task._id,
       babyId: task.babyId,
       openId,
-      templateId: TEMPLATES[TYPE_TEMPLATE_MAP[task.type]] || '',
+      templateId: TEMPLATES[TYPE_TEMPLATE_MAP[task.type]] || "",
       quotaId,
       sendStatus: status,
       errorCode: error?.code || null,
