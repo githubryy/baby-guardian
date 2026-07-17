@@ -12,11 +12,11 @@ const { cloud, db, _, success, fail, nowISO, isWithinWindow, getNextWindowStart 
 const BATCH_LIMIT = 50;
 const LOCK_TIMEOUT_MINUTES = 5;
 
-// 订阅消息模板ID (替换为实际值)
+// 订阅消息模板ID (需与微信公众平台申请的一致)
 const TEMPLATES = {
-  feeding: '',
-  care: '',
-  medicine: '',
+  feeding:   'cJTFLqrWfBPcHGmBsMiVp86CZ5Tf4Gl9oAHIWKtcLaQ',
+  care:      'WvNgDqkdCzyJuTeirnpFjNDX3oVYJ7wLmGuK8hJbVu4',
+  medicine:  'Iqg9G1yjGeuWB4NZ9C6xbQa9hbvn_IRn8B2gezTcElw',
 };
 
 // 模板与事项类型映射

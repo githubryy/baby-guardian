@@ -155,6 +155,10 @@ export interface ConfirmLog {
   operatorAvatar?: string;
   /** 操作人身份 */
   operatorRelation?: FamilyRelation;
+  /** 事件模式（旧数据可能缺失） */
+  taskMode?: TaskMode;
+  /** 循环事件已完成次数（仅 taskMode=recurring 且 action=completed 时有值，旧数据可能缺失） */
+  completedCount?: number;
   createdAt: string;
 }
 
@@ -326,11 +330,11 @@ export interface TimelineItem {
   assigneeName?: string;
   assigneeAvatar?: string;
   /** 事件执行模式 */
-  taskMode?: TaskMode;
+  taskMode: TaskMode;
   /** 循环次数 (-1=无限循环) */
   repeatCount?: number;
   /** 已完成循环次数 */
-  completedCount?: number;
+  completedCount: number;
   /** 提醒间隔(分钟) - 用于计算下次执行时间 */
   intervalMinutes?: number;
   /** 下次提醒时间(ISO) - 循环事件完成后的下次时间 */

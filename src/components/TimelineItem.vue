@@ -117,7 +117,7 @@ const recurringProgressText = computed(() => {
   if (!props.item.taskMode || props.item.taskMode !== 'recurring') return '';
   const count = props.item.completedCount ?? 0;
   const repeat = props.item.repeatCount;
-  if (repeat === -1) return `第${count}次`;
+  if (repeat === -1) return count ? `第${count}次` : '';
   return `第${count}/${repeat}次`;
 });
 

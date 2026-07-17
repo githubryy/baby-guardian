@@ -28,7 +28,7 @@ export function requestSubscribeAuthorization(
 
     wx.requestSubscribeMessage({
       tmplIds,
-      success(res) {
+      success(res: { [x: string]: string; }) {
         // res 中返回每个模板的授权结果: 'accept' | 'reject' | 'ban'
         const accepted: TemplateKey[] = [];
         templates.forEach((key, index) => {
@@ -47,7 +47,7 @@ export function requestSubscribeAuthorization(
 
         resolve(accepted);
       },
-      fail(err) {
+      fail(err: { errMsg: string | string[]; }) {
         console.error('[订阅授权失败]', err);
         // 用户拒绝或关闭弹窗不算错误
         if (err.errMsg?.includes('request:fail')) {
@@ -64,7 +64,6 @@ export function requestSubscribeAuthorization(
  * 记录订阅授权到云函数 (写入配额)
  */
 export function recordSubscriptionQuota(acceptedTemplates: TemplateKey[]): Promise<void> {
-  console.log('acceptedTemplates', acceptedTemplates)
   return callCloud(CLOUD_FUNCTIONS.SUBSCRIBE, {
     action: 'recordQuota',
     templates: acceptedTemplates,

@@ -23,11 +23,11 @@
 
     <!-- 类型筛选 -->
     <scroll-view scroll-x class="type-filter" :show-scrollbar="false">
-      <view class="type-chip tap-shrink" :class="{ active: !filterType }" @tap="filterType = ''">
+      <view class="type-chip tap-shrink" :class="{ active: !filterType }" @tap="handleFilterTypeChange()">
         <text>全部</text>
       </view>
       <view v-for="opt in TASK_TYPE_OPTIONS" :key="opt.value" class="type-chip tap-shrink"
-        :class="{ active: filterType === opt.value }" @tap="filterType = opt.value">
+        :class="{ active: filterType === opt.value }" @tap="handleFilterTypeChange(opt.value)">
         <u-icon :name="opt.icon" :size="13" :color="filterType === opt.value ? '#fff' : opt.color" />
         <text>{{ opt.label }}</text>
       </view>
@@ -55,7 +55,7 @@
           <u-tag :text="group.items.length + ' 条'" type="info" size="mini" shape="circle" plain />
         </view>
         <view class="group-items slide-up-stagger">
-          <view v-for="item in group.items" :key="item._id" class="history-item">
+          <view v-for="item in group.items" :key="item._id + item.completedTime" class="history-item">
             <view class="item-time">
               <text class="time">{{ formatTime(item.completedTime) }}</text>
             </view>
@@ -63,7 +63,10 @@
               <u-icon :name="getTypeConfig(item).icon" :size="22" :color="getTypeConfig(item).color" />
             </view>
             <view class="item-info">
-              <text class="item-name">{{ getTypeConfig(item).name }}</text>
+              <view class="item-name-row">
+                <text class="item-name">{{ getTypeConfig(item).name }}</text>
+                <text v-if="item.taskMode === 'recurring'" class="exec-index">循环-第{{ item.completedCount || 0 }}次</text>
+              </view>
               <view class="item-action-wrap">
                 <view class="action-dot" :class="item.action" />
                 <text class="item-action" :class="item.action">{{ actionText(item.action) }}</text>
@@ -217,6 +220,11 @@ function onStartDateChange(e: any) {
 
 function onEndDateChange(e: any) {
   filterEndDate.value = e.detail.value;
+  loadHistory();
+}
+
+function handleFilterTypeChange(optVal: TaskType | '' = '') {
+  filterType.value = optVal;
   loadHistory();
 }
 
@@ -402,11 +410,24 @@ function resetFilter() {
   .item-info {
     flex: 1;
 
-    .item-name {
-      display: block;
-      font-size: 28rpx;
-      color: #2d2d2d;
-      font-weight: 500;
+    .item-name-row {
+      display: flex;
+      align-items: center;
+      gap: 50rpx;
+
+      .item-name {
+        font-size: 28rpx;
+        color: #2d2d2d;
+        font-weight: 500;
+      }
+
+      .exec-index {
+        font-size: 20rpx;
+        color: #4A90D9;
+        background: #EBF3FC;
+        padding: 2rpx 10rpx;
+        border-radius: 6rpx;
+      }
     }
 
     .item-action-wrap {

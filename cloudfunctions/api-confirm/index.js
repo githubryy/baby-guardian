@@ -61,6 +61,12 @@ async function handleConfirm(userId, familyId, currentUser, data) {
     operatorName: currentUser.nickName || '家庭成员',
     operatorAvatar: currentUser.avatarUrl || '',
     operatorRelation: currentUser.relation || 'other',
+    // 循环事件标识
+    taskMode: task.taskMode || 'once',
+    // 循环事件：延迟/忽略时也保留当前的 completedCount
+    completedCount: task.taskMode === 'recurring'
+      ? (action === 'completed' ? (task.completedCount || 0) + 1 : (task.completedCount || 0))
+      : null,
     createdAt: now,
   };
   const { _id: logId } = await db.collection('confirm_logs').add({ data: log });

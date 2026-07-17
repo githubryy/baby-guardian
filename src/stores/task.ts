@@ -134,8 +134,10 @@ export const useTaskStore = defineStore('task', () => {
     action: 'completed' | 'delayed' | 'ignored' | 'paused';
     delayMinutes?: number;
     remark?: string;
-    taskType?: string;
-    taskName?: string;
+    taskType: TaskType;
+    taskName: string;
+    taskMode: TaskMode;
+    completedCount: number;
   }): Promise<boolean> {
     try {
       await confirmApi.confirmTask(data);

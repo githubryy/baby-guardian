@@ -137,7 +137,6 @@ const avatarIconColor = computed(() => {
 });
 
 onLoad((options) => {
-  console.log('options', options);
   if (options?.id) {
     isEdit.value = true;
     editId.value = options.id;

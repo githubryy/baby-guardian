@@ -125,7 +125,7 @@ export const SUBSCRIBE_TEMPLATES: SubscribeTemplate[] = [
   },
   {
     key: 'medicine',
-    templateId: 'cJTFLqrWfBPcHGmBsMiVp86CZ5Tf4Gl9oAHIWKtcLaQ', // 替换为实际模板ID
+    templateId: 'Iqg9G1yjGeuWB4NZ9C6xbQa9hbvn_IRn8B2gezTcElw', // 替换为实际模板ID
     title: '用药提醒',
     applicableTypes: ['vitamin', 'medicine'],
   },

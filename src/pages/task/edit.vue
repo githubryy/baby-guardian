@@ -12,7 +12,8 @@
             <view class="type-icon-box" :style="{ background: opt.color + '15' }">
               <u-icon :name="opt.icon" :size="16" :color="isTypeDisabled(opt.value) ? '#ccc' : opt.color" />
             </view>
-            <text class="type-name" :style="{ color: isTypeDisabled(opt.value) ? '#ccc' : (form.type === opt.value ? opt.color : '#666') }">
+            <text class="type-name"
+              :style="{ color: isTypeDisabled(opt.value) ? '#ccc' : (form.type === opt.value ? opt.color : '#666') }">
               {{ opt.label }}
             </text>
             <text v-if="isTypeDisabled(opt.value)" class="type-exists-tag">已存在</text>
@@ -52,8 +53,7 @@
       <view class="form-item">
         <text class="form-label">事件模式</text>
         <view class="mode-row">
-          <view class="mode-option" :class="{ active: form.taskMode === 'once' }"
-            @tap="form.taskMode = 'once'">
+          <view class="mode-option" :class="{ active: form.taskMode === 'once' }" @tap="form.taskMode = 'once'">
             <view class="mode-radio" :class="{ checked: form.taskMode === 'once' }">
               <view v-if="form.taskMode === 'once'" class="mode-radio-dot" />
             </view>
@@ -79,8 +79,7 @@
       <view v-if="form.taskMode === 'recurring'" class="form-item">
         <text class="form-label">循环次数</text>
         <view class="repeat-row">
-          <view class="repeat-option" :class="{ active: isInfiniteLoop }"
-            @tap="form.repeatCount = -1">
+          <view class="repeat-option" :class="{ active: isInfiniteLoop }" @tap="form.repeatCount = -1">
             <text>无限循环</text>
           </view>
           <view class="repeat-option" :class="{ active: !isInfiniteLoop }"
@@ -230,14 +229,13 @@ const priorityHint = computed(() => {
   return '普通事项，使用小程序内通知（不消耗配额）';
 });
 
-// 已存在活跃事项的类型集合（防止重复添加）
+// 阻止选择的类型集合（只有已完成和暂停状态的事件才可以重复选择）
 const activeTaskTypes = computed(() => {
   if (isEdit.value) return new Set<TaskType>(); // 编辑模式下不限制
   const babyId = babyStore.currentBabyId;
-  console.log('activeTaskTypes', taskStore.taskList);
   return new Set(
-    taskStore.taskList
-      .filter((t) => t.babyId === babyId && t.enabled)
+    taskStore.timeline
+      .filter((t) => t.babyId === babyId && t.status !== 'completed' && t.status !== 'paused')
       .map((t) => t.type)
   );
 });
@@ -271,6 +269,16 @@ watch(() => form.value.type, (newType) => {
     form.value.priority = config.defaultPriority;
   }
 });
+
+// 默认值与禁用联动：如果默认类型被禁用，自动切换到第一个可选类型
+watch(activeTaskTypes, (disabledTypes) => {
+  if (isEdit.value) return;
+  if (!disabledTypes.has(form.value.type)) return;
+  const available = TASK_TYPE_OPTIONS.find((opt) => !disabledTypes.has(opt.value));
+  if (available) {
+    form.value.type = available.value;
+  }
+}, { immediate: true });
 
 onLoad((options) => {
   if (options?.id) {
@@ -332,7 +340,7 @@ async function onSave() {
     const data = {
       babyId: babyStore.currentBabyId,
       type: form.value.type,
-      typeName: TASK_TYPE_CONFIG[form.value.type].name, 
+      typeName: TASK_TYPE_CONFIG[form.value.type].name,
       customName: form.value.type === 'custom' ? form.value.customName.trim() : undefined,
       firstTime: form.value.firstTime,
       intervalMinutes: form.value.intervalMinutes,
@@ -352,7 +360,9 @@ async function onSave() {
       }
     } else {
       // 在 tap 上下文中先发起订阅授权，避免 await 后丢失手势上下文
-      await guideBatchAuthorization('添加事项后');
+      const accepted = await guideBatchAuthorization('添加事项后');
+      // 用户取消授权，不执行后续操作
+      if (accepted === 0) return
       const ok = await taskStore.addTask(data);
       if (ok) {
         setTimeout(() => uni.navigateBack(), 600);

@@ -4,7 +4,7 @@
       <text class="quota-num">{{ available }}</text>
     </view>
     <text class="quota-text">{{ available > 2 ? '提醒充足' : available > 0 ? '即将不足' : '已耗尽' }}</text>
-    <view v-if="available <= 2" class="quota-action tap-feedback">
+    <view v-show="available <= 2" class="quota-action tap-feedback">
       <u-icon name="reload" :size="12" color="#FF7B7B" />
       <text>补充</text>
     </view>

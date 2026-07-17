@@ -27,7 +27,7 @@ export function callCloud<T = any>(name: string, data?: Record<string, any>, tim
     wx.cloud.callFunction({
       name,
       data: data || {},
-      success(res) {
+      success(res: { result: CloudResult<T>; }) {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
@@ -40,7 +40,7 @@ export function callCloud<T = any>(name: string, data?: Record<string, any>, tim
           reject(new Error(errMsg));
         }
       },
-      fail(err) {
+      fail(err: any) {
         if (settled) return;
         settled = true;
         clearTimeout(timer);

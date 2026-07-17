@@ -142,7 +142,26 @@ const babyStore = useBabyStore();
 const userStore = useUserStore();
 const { availableQuota } = storeToRefs(userStore);
 
-const task = ref<ReminderTask | null>(null);
+const task = ref<ReminderTask>({
+  _id: '',
+  babyId: '',
+  userId: '',
+  type: 'feeding',
+  enabled: false,
+  firstTime: '',
+  intervalMinutes: 0,
+  nextRemindTime: '',
+  reminderWindowStart: '',
+  reminderWindowEnd: '',
+  windowSkipStrategy: 'delay_to_next_window',
+  retryCount: 0,
+  processingLock: false,
+  priority: 'p0',
+  taskMode: 'once',
+  repeatCount: 0,
+  completedCount: 0,
+  createdAt: ''
+});
 const taskId = ref('');
 const submitting = ref(false);
 
@@ -155,7 +174,6 @@ onLoad((options) => {
 
 async function loadTask() {
   try {
-    console.log('taskStore.taskList', taskStore.taskList)
     const localTask = taskStore.taskList.find((t) => t._id === taskId.value);
     if (localTask) {
       task.value = localTask;
@@ -248,6 +266,8 @@ async function onComplete() {
       action: 'completed',
       taskType: task.value?.type,
       taskName: getTaskName(),
+      taskMode: task.value?.taskMode,
+      completedCount: task.value?.completedCount,
     });
     if (ok) {
       await guideBatchAuthorization('完成确认后');
@@ -298,6 +318,8 @@ function onDelay() {
           delayMinutes: minutes,
           taskType: task.value?.type,
           taskName: getTaskName(),
+          taskMode: task.value?.taskMode,
+          completedCount: task.value?.completedCount
         });
         if (ok) {
           uni.showToast({ title: `已延迟${minutes}分钟`, icon: 'none' });
@@ -327,6 +349,8 @@ async function onIgnore() {
             action: 'ignored',
             taskType: task.value?.type,
             taskName: getTaskName(),
+            taskMode: task.value?.taskMode,
+            completedCount: task.value?.completedCount
           });
           if (ok) uni.navigateBack();
         } finally {
@@ -354,6 +378,8 @@ async function onPause() {
             action: 'paused',
             taskType: task.value?.type,
             taskName: getTaskName(),
+            taskMode: task.value?.taskMode,
+            completedCount: task.value?.completedCount
           });
           if (ok) {
             uni.showToast({ title: '事件已结束，需重新添加才能恢复', icon: 'none', duration: 2000 });
