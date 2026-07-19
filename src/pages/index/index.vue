@@ -51,9 +51,12 @@
             <view class="overview-header">
               <view class="overview-title-wrap">
                 <u-icon name="list-dot" :size="18" color="#2d2d2d" />
-                <text class="overview-title">今日提醒</text>
+                <text class="overview-title">今日事件</text>
               </view>
-              <text class="overview-date">{{ todayText }}</text>
+              <view class="overview-actions">
+                <text class="all-task-link tap-shrink" @tap="goAllTasks">所有事项</text>
+                <text class="overview-date">{{ todayText }}</text>
+              </view>
             </view>
             <view class="overview-stats">
               <view class="stat-item">
@@ -307,6 +310,10 @@ function goAddTask() {
   uni.navigateTo({ url: '/pages/task/edit' });
 }
 
+function goAllTasks() {
+  uni.navigateTo({ url: '/pages/task/list' });
+}
+
 function goTaskDetail(item: TimelineItem) {
   uni.navigateTo({ url: `/pages/confirm/index?taskId=${item.taskId}` });
 }
@@ -351,7 +358,7 @@ async function handleDelay(item: TimelineItem) {
           taskMode: item.taskMode,
           completedCount: item.completedCount
         });
-        loadData();
+        // loadData();
       } catch (e: any) {
         console.error('[handleDelay] 操作失败:', e);
         uni.showToast({ title: '操作失败，请重试', icon: 'none' });
@@ -516,10 +523,25 @@ async function handleIgnore(item: TimelineItem) {
       }
     }
 
-    .overview-date {
-      font-size: 24rpx;
-      color: #aaa;
+    .overview-actions {
+      display: flex;
+      align-items: center;
+      gap: 20rpx;
+
+      .all-task-link {
+        font-size: 24rpx;
+        color: #ff7b7b;
+        padding: 6rpx 16rpx;
+        background: rgba(255, 123, 123, 0.08);
+        border-radius: 20rpx;
+      }
+
+      .overview-date {
+        font-size: 24rpx;
+        color: #aaa;
+      }
     }
+
   }
 
   .overview-stats {

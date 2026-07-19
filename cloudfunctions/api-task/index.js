@@ -275,6 +275,20 @@ async function handleTimeline(userId, familyId, babyId) {
     timeline.push(buildItem(task, { status, isRecurring }));
   });
 
+  // 补充今日确认/延迟过但 nextRemindTime 已跨天的任务（被 todayEnd 过滤掉了）
+  const taskInTimelineIds = new Set(timeline.map(t => t.taskId));
+  const extraTaskIds = Array.from(confirmedTaskIds).filter(id => !taskInTimelineIds.has(id));
+  if (extraTaskIds.length > 0) {
+    const { data: extraTasks } = await db.collection('reminder_tasks')
+      .where({ _id: db.command.in(extraTaskIds) })
+      .get();
+    extraTasks.forEach((task) => {
+      const isRecurring = task.taskMode === 'recurring';
+      const status = task.enabled ? ((isRecurring && !confirmedTaskIds.has(task._id)) ? 'overdue' : 'completed') : 'paused';
+      timeline.push(buildItem(task, { status, isRecurring }));
+    });
+  }
+
   // 补充今日被临时结束的任务（enabled=false 不会在常规查询中返回）
   if (pausedTaskIds.size > 0) {
     const { data: pausedTasks } = await db.collection('reminder_tasks')

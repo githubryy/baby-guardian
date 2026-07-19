@@ -97,8 +97,11 @@ async function handleConfirm(userId, familyId, currentUser, data) {
     // 一次性任务: 不更新 nextRemindTime（已完成无需再次提醒）
     await db.collection('reminder_tasks').doc(taskId).update({ data: updateData });
   } else if (action === 'delayed') {
-    // 延迟: 在 nextRemindTime 基础上再推迟
-    const baseTime = task.nextRemindTime ? new Date(task.nextRemindTime) : new Date();
+    // 延迟: 从 nextRemindTime 和 now 中取较晚者，再增加 delayMinutes
+    // 避免已超时任务延迟后时间仍在过去，也防止叠加跨天导致前端消失
+    const nowDate = new Date();
+    const nextRemind = task.nextRemindTime ? new Date(task.nextRemindTime) : nowDate;
+    const baseTime = nextRemind.getTime() < nowDate.getTime() ? nowDate : nextRemind;
     baseTime.setMinutes(baseTime.getMinutes() + (delayMinutes || 15));
     await db.collection('reminder_tasks').doc(taskId).update({
       data: {

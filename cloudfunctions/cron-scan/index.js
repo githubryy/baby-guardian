@@ -110,19 +110,16 @@ exports.main = async (event, context) => {
           return;
         }
 
-        // 4y. 已超时任务 — 不重新计算时间，等待用户手动确认
+        // 4y. 显著超时任务 — 不推送、不更新 nextRemindTime，等待用户手动确认
+        // 仅当超时超过 2×interval（或至少 10 分钟）才跳过，刚到期的正常推送
         const remindTimeMs = new Date(task.nextRemindTime).getTime();
-        if (remindTimeMs < now.getTime()) {
-          console.log(`[cron-scan] 事项 ${task._id} 已超时，跳过，等待用户确认`);
-          if (task.taskMode === 'recurring') {
-            // 循环任务: 将 nextRemindTime 推到未来，防止下分钟重复扫描
-            // 前端通过 handleTimeline 的 gap 判断展示 overdue
-            const intervalMs = (task.intervalMinutes || 30) * 60 * 1000;
-            const safeTime = new Date(now.getTime() + Math.max(intervalMs * 2, 30 * 60 * 1000));
-            await db.collection('reminder_tasks').doc(task._id).update({
-              data: { nextRemindTime: safeTime.toISOString() },
-            });
-          }
+        const gapMs = now.getTime() - remindTimeMs;
+        const overdueThreshold = Math.max(
+          (task.intervalMinutes || 30) * 60 * 1000 * 2,
+          10 * 60 * 1000
+        );
+        if (gapMs > overdueThreshold) {
+          console.log(`[cron-scan] 事项 ${task._id} 显著超时(${Math.round(gapMs / 60000)}分钟)，跳过`);
           return;
         }
 
@@ -217,7 +214,6 @@ exports.main = async (event, context) => {
             });
           return;
         }
-
         // 4e. 向有配额的家庭成员发送订阅消息
         let anySuccess = false;
         for (const fq of familyQuotas) {
@@ -380,7 +376,6 @@ async function sendSubscriptionMessage(task, familyQuota) {
 
     // 构建消息数据 (根据模板字段配置)
     const sendData = buildMessageData(task, baby, templateKey);
-
     const result = await cloud.openapi.subscribeMessage.send({
       touser: familyQuota.openId,
       templateId,
@@ -426,31 +421,28 @@ function buildMessageData(task, baby, templateKey) {
 
   switch (templateKey) {
     case "feeding":
-      // 模板A: 喂养提醒 — 宝宝昵称、事项类型、距上次时长、提醒时间
+      // 模板ID: cJTFL... (签到提醒) — 字段: time11(任务时间), thing1(活动名称)
       return {
-        thing1: { value: babyName },
-        thing2: { value: "喂养" },
-        time3: { value: timeStr },
+        thing1: { value: `${babyName} ${taskName || "喂养"}` },
+        time11: { value: timeStr },
       };
     case "care":
-      // 模板B: 护理提醒 — 宝宝昵称、事项类型、提醒时间
+      // 模板ID: WvNgD... (定时维护提醒) — 字段: time3(提醒时间), thing4(提醒内容)
       return {
-        thing1: { value: babyName },
-        thing2: { value: taskName || "护理" },
         time3: { value: timeStr },
+        thing4: { value: `${babyName} ${taskName || "护理"}` },
       };
     case "medicine":
-      // 模板C: 用药提醒 — 宝宝昵称、药品名称、用量、提醒时间
+      // 模板ID: Iqg9G... (日程提醒) — 字段: thing2(提醒内容), time3(执行时间), thing8(紧急度)
       return {
-        thing1: { value: babyName },
-        thing2: { value: taskName || "用药" },
+        thing2: { value: `${babyName} ${taskName || "用药"}` },
         time3: { value: timeStr },
+        thing8: { value: "普通" },
       };
     default:
       return {
-        thing1: { value: babyName },
-        thing2: { value: "提醒" },
         time3: { value: timeStr },
+        thing4: { value: "提醒" },
       };
   }
 }

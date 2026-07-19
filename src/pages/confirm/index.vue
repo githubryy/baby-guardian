@@ -53,8 +53,19 @@
       </view>
     </view>
 
+    <!-- 已完成提示 -->
+    <view v-if="isCompleted" class="action-card completed-card slide-up" style="animation-delay: 0.1s">
+      <view class="completed-content">
+        <view class="completed-icon-wrap">
+          <u-icon name="checkmark-circle-fill" :size="56" color="#1d9e75" />
+        </view>
+        <text class="completed-title">该事件已完成</text>
+        <text class="completed-desc">{{ completedDescText }}</text>
+      </view>
+    </view>
+
     <!-- 操作区域 -->
-    <view class="action-card slide-up" style="animation-delay: 0.1s">
+    <view v-else class="action-card slide-up" style="animation-delay: 0.1s">
       <view class="action-title">请选择操作</view>
       <view class="action-list">
         <!-- 完成 -->
@@ -229,6 +240,26 @@ const recurringModeText = computed(() => {
   const count = t.completedCount || 0;
   if (t.repeatCount === -1) return `循环执行 · 第 ${count} 次`;
   return `循环执行 · 第 ${count}/${t.repeatCount} 次`;
+});
+
+// 是否已完成（一次性任务已完成 或 循环任务已完成全部次数）
+const isCompleted = computed(() => {
+  const t = task.value;
+  if (!t) return false;
+  // 一次性任务: lastCompletedTime 存在即为已完成
+  if (t.taskMode === 'once' && t.lastCompletedTime) return true;
+  // 循环任务: repeatCount > 0 且 completedCount >= repeatCount 表示全部完成
+  if (t.taskMode === 'recurring' && t.repeatCount > 0 && (t.completedCount || 0) >= t.repeatCount) return true;
+  return false;
+});
+
+// 已完成描述文字
+const completedDescText = computed(() => {
+  const t = task.value;
+  if (!t) return '';
+  if (t.taskMode === 'once') return '该一次性事件已确认完成';
+  if (t.taskMode === 'recurring') return `已完成全部 ${t.repeatCount} 次循环`;
+  return '';
 });
 
 // 完成操作描述（循环事件显示下次执行时间）
@@ -582,6 +613,31 @@ async function onSupplementQuota() {
           margin-top: 4rpx;
         }
       }
+    }
+  }
+}
+
+.completed-card {
+  .completed-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48rpx 0 32rpx;
+
+    .completed-icon-wrap {
+      margin-bottom: 24rpx;
+    }
+
+    .completed-title {
+      font-size: 32rpx;
+      font-weight: 700;
+      color: #1d9e75;
+      margin-bottom: 8rpx;
+    }
+
+    .completed-desc {
+      font-size: 26rpx;
+      color: #999;
     }
   }
 }

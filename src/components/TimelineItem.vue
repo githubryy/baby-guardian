@@ -17,7 +17,8 @@
           <text v-if="item.customName" class="custom-name">{{ item.customName }}</text>
         </view>
         <view class="header-tags">
-          <u-tag v-if="item.taskMode === 'recurring'" text="循环" type="error" size="mini" shape="circle" />
+          <u-tag :text="priorityConfig.name" :type="priorityTagType" size="mini" shape="circle" plain />
+          <u-tag v-if="item.taskMode === 'recurring'" text="循环" type="info" size="mini" shape="circle" />
           <u-tag v-if="statusTag" :text="statusTag" :type="statusTagType" size="mini" shape="circle" />
         </view>
       </view>
@@ -91,7 +92,7 @@
 import { computed } from 'vue';
 import type { TimelineItem, FamilyRelation } from '@/types';
 import { formatTime, relativeTime } from '@/utils/time';
-import { TASK_TYPE_CONFIG, FAMILY_RELATION_CONFIG } from '@/utils/constants';
+import { TASK_TYPE_CONFIG, PRIORITY_CONFIG, FAMILY_RELATION_CONFIG } from '@/utils/constants';
 
 const props = defineProps<{
   item: TimelineItem;
@@ -115,6 +116,17 @@ const timeText = computed(() => {
 });
 
 const safeTypeColor = computed(() => props.item.typeColor || '#999');
+
+const priorityConfig = computed(() => PRIORITY_CONFIG[props.item.priority] || PRIORITY_CONFIG.p1);
+
+const priorityTagType = computed<'error' | 'warning' | 'primary'>(() => {
+  const map: Record<string, 'error' | 'warning' | 'primary'> = {
+    p0: 'error',
+    p1: 'warning',
+    p2: 'primary',
+  };
+  return map[props.item.priority] || 'primary';
+});
 
 const taskUIcon = computed(() => {
   return TASK_TYPE_CONFIG[props.item.type]?.uIcon || 'edit-pen';

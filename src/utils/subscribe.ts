@@ -7,8 +7,13 @@ import type { TemplateKey, QuotaSummary } from '@/types';
 import { callCloud } from './request';
 
 /**
+ * 防重入锁: 防止上一次 wx.requestSubscribeMessage 未结束时再次调用
+ */
+let subscribingLock = false;
+
+/**
  * 请求订阅消息授权
- * 微信限制: 每次弹窗最多 3 个模板
+ * 微信限制: 每次弹窗最多 3 个模板，不支持并发调用
  * @param templates 需要授权的模板列表
  * @returns 用户授权的模板列表
  */
@@ -16,6 +21,12 @@ export function requestSubscribeAuthorization(
   templates: TemplateKey[] = ['feeding', 'care', 'medicine'],
 ): Promise<TemplateKey[]> {
   return new Promise((resolve, reject) => {
+    if (subscribingLock) {
+      console.warn('[订阅授权] 上一次授权弹窗尚未关闭，跳过本次请求');
+      resolve([]);
+      return;
+    }
+
     const tmplIds = templates
       .map((key) => SUBSCRIBE_TEMPLATES.find((t) => t.key === key)?.templateId)
       .filter(Boolean) as string[];
@@ -26,9 +37,11 @@ export function requestSubscribeAuthorization(
       return;
     }
 
+    subscribingLock = true;
     wx.requestSubscribeMessage({
       tmplIds,
       success(res: { [x: string]: string; }) {
+        subscribingLock = false;
         // res 中返回每个模板的授权结果: 'accept' | 'reject' | 'ban'
         const accepted: TemplateKey[] = [];
         templates.forEach((key, index) => {
@@ -48,6 +61,7 @@ export function requestSubscribeAuthorization(
         resolve(accepted);
       },
       fail(err: { errMsg: string | string[]; }) {
+        subscribingLock = false;
         console.error('[订阅授权失败]', err);
         // 用户拒绝或关闭弹窗不算错误
         if (err.errMsg?.includes('request:fail')) {
