@@ -44,7 +44,7 @@
         </view>
 
         <!-- 循环事件: 下次执行时间 -->
-        <view v-if="item.taskMode === 'recurring' && nextRemindTimeDisplay" class="next-remind-row">
+        <view v-if="item.taskMode === 'recurring' && nextRemindTimeDisplay && item.status === 'pending'" class="next-remind-row">
           <u-icon name="reload" :size="13" color="#ff7b7b" />
           <text class="next-remind-label">下次执行</text>
           <text class="next-remind-remaining">{{ item.nextRemindRemaining }}</text>
@@ -90,7 +90,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { TimelineItem, FamilyRelation } from '@/types';
-import { formatTime } from '@/utils/time';
+import { formatTime, relativeTime } from '@/utils/time';
 import { TASK_TYPE_CONFIG, FAMILY_RELATION_CONFIG } from '@/utils/constants';
 
 const props = defineProps<{
@@ -104,7 +104,15 @@ defineEmits<{
   (e: 'ignore', item: TimelineItem): void;
 }>();
 
-const timeText = computed(() => formatTime(props.item.remindTime));
+const timeText = computed(() => {
+  if (props.item.status === 'completed' && props.item.completedAt) {
+    return formatTime(props.item.completedAt);
+  }
+  if (props.item.status === 'overdue') {
+    return relativeTime(props.item.remindTime);
+  }
+  return formatTime(props.item.remindTime);
+});
 
 const safeTypeColor = computed(() => props.item.typeColor || '#999');
 

@@ -253,9 +253,22 @@ async function handleTimeline(userId, familyId, babyId) {
 
     let status = 'pending';
     if (isRecurring) {
-      if (remindTime.getTime() < now.getTime()) status = 'overdue';
+      if (remindTime.getTime() < now.getTime()) {
+        status = 'overdue';
+      } else if (!isConfirmed) {
+        // nextRemindTime 在未来但今日未操作 → cron 可能在用户无感知时推进了时间
+        // 通过 lastCompletedTime 与 nextRemindTime 的差距判断是否被 cron 推后
+        const intervalMs = (task.intervalMinutes || 0) * 60 * 1000;
+        const lastCompletedTs = task.lastCompletedTime ? new Date(task.lastCompletedTime).getTime() : 0;
+        const gap = remindTime.getTime() - lastCompletedTs;
+        // 距上次完成超过 1 个间隔 → 由 cron 推动 → 已超时
+        if (!lastCompletedTs || gap > intervalMs * 1.5) {
+          status = 'overdue';
+        }
+      }
     } else {
-      if (isConfirmed) status = 'completed';
+      // 一次性任务: 今天确认过 或 曾经完成过(跨天) → 已完成
+      if (isConfirmed || task.lastCompletedTime) status = 'completed';
       else if (remindTime.getTime() < now.getTime()) status = 'overdue';
     }
 

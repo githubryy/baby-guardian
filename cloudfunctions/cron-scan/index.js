@@ -22,6 +22,21 @@ const {
 const BATCH_LIMIT = 50;
 const LOCK_TIMEOUT_MINUTES = 5;
 
+/**
+ * 基于当前排定时间计算下一个提醒时间（保持对齐，防止漂移）
+ * @param {string} currentNextRemindTime 当前 nextRemindTime（ISO 字符串）
+ * @param {number} intervalMinutes 间隔分钟
+ * @param {Date} now 当前时间
+ */
+function calcNextRemindTime(currentNextRemindTime, intervalMinutes, now) {
+  let nextTime = new Date(new Date(currentNextRemindTime).getTime() + intervalMinutes * 60 * 1000);
+  // 循环递推直到未来，确保不落后于当前时间
+  while (nextTime.getTime() <= now.getTime()) {
+    nextTime = new Date(nextTime.getTime() + intervalMinutes * 60 * 1000);
+  }
+  return nextTime;
+}
+
 // 订阅消息模板ID (需与微信公众平台申请的一致)
 const TEMPLATES = {
   feeding: "cJTFLqrWfBPcHGmBsMiVp86CZ5Tf4Gl9oAHIWKtcLaQ",
@@ -89,6 +104,28 @@ exports.main = async (event, context) => {
       tasks.map(async (task) => {
         processed++;
 
+        // 4z. 已完成的一次性任务 — 跳过，无需再次提醒
+        if (task.taskMode === 'once' && task.lastCompletedTime) {
+          console.log(`[cron-scan] 事项 ${task._id} 已完成的一次性任务，跳过`);
+          return;
+        }
+
+        // 4y. 已超时任务 — 不重新计算时间，等待用户手动确认
+        const remindTimeMs = new Date(task.nextRemindTime).getTime();
+        if (remindTimeMs < now.getTime()) {
+          console.log(`[cron-scan] 事项 ${task._id} 已超时，跳过，等待用户确认`);
+          if (task.taskMode === 'recurring') {
+            // 循环任务: 将 nextRemindTime 推到未来，防止下分钟重复扫描
+            // 前端通过 handleTimeline 的 gap 判断展示 overdue
+            const intervalMs = (task.intervalMinutes || 30) * 60 * 1000;
+            const safeTime = new Date(now.getTime() + Math.max(intervalMs * 2, 30 * 60 * 1000));
+            await db.collection('reminder_tasks').doc(task._id).update({
+              data: { nextRemindTime: safeTime.toISOString() },
+            });
+          }
+          return;
+        }
+
         // 4a. 检查提醒窗口
         if (
           !isWithinWindow(now, task.reminderWindowStart, task.reminderWindowEnd)
@@ -106,10 +143,8 @@ exports.main = async (event, context) => {
                 data: { nextRemindTime: nextStart.toISOString() },
               });
           } else {
-            // skip_and_continue: 直接计算下一个间隔
-            const nextTime = new Date(
-              now.getTime() + task.intervalMinutes * 60 * 1000,
-            );
+            // skip_and_continue: 基于排定时间递推，防止漂移
+            const nextTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now);
             await db
               .collection("reminder_tasks")
               .doc(task._id)
@@ -123,10 +158,7 @@ exports.main = async (event, context) => {
         // 4b. P2 优先级事项 — 仅红点通知，不消耗配额
         if (task.priority === "p2") {
           console.log(`[cron-scan] 事项 ${task._id} 为P2优先级，仅红点通知`);
-          // 计算下次提醒时间
-          const nextTime = new Date(
-            now.getTime() + task.intervalMinutes * 60 * 1000,
-          );
+          const nextTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now);
           await db
             .collection("reminder_tasks")
             .doc(task._id)
@@ -148,9 +180,7 @@ exports.main = async (event, context) => {
           console.log(
             `[cron-scan] 事项 ${task._id} 第${task.retryCount}次重试，降级为红点`,
           );
-          const nextTime = new Date(
-            now.getTime() + task.intervalMinutes * 60 * 1000,
-          );
+          const nextTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now);
           await db
             .collection("reminder_tasks")
             .doc(task._id)
@@ -209,9 +239,7 @@ exports.main = async (event, context) => {
         }
 
         // 4f. 更新事项: 设置下次提醒时间 + retryCount
-        const nextTime = new Date(
-          now.getTime() + task.intervalMinutes * 60 * 1000,
-        );
+        const nextTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now);
         await db
           .collection("reminder_tasks")
           .doc(task._id)

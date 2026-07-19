@@ -73,27 +73,28 @@ async function handleConfirm(userId, familyId, currentUser, data) {
 
   // 更新事项状态
   if (action === 'completed') {
-    // 完成: 重置重试次数，计算下次提醒时间，记录完成者
-    const nextRemind = new Date();
-    nextRemind.setMinutes(nextRemind.getMinutes() + task.intervalMinutes);
+    // 完成: 记录完成者信息，重置重试次数
     const updateData = {
       lastCompletedTime: now,
       lastCompletedBy: userId,
       lastCompletedByName: currentUser.nickName,
       lastCompletedByRelation: currentUser.relation || 'other',
-      nextRemindTime: nextRemind.toISOString(),
       retryCount: 0,
       processingLock: false,
       lockedAt: null,
     };
-    // 循环事件: 递增 completedCount
     if (task.taskMode === 'recurring') {
+      // 循环事件: 计算下次提醒时间 + 递增 completedCount
+      const nextRemind = new Date();
+      nextRemind.setMinutes(nextRemind.getMinutes() + task.intervalMinutes);
+      updateData.nextRemindTime = nextRemind.toISOString();
       updateData.completedCount = (task.completedCount || 0) + 1;
       // 有限循环且已完成全部次数 → 自动停用
       if (task.repeatCount > 0 && updateData.completedCount >= task.repeatCount) {
         updateData.enabled = false;
       }
     }
+    // 一次性任务: 不更新 nextRemindTime（已完成无需再次提醒）
     await db.collection('reminder_tasks').doc(taskId).update({ data: updateData });
   } else if (action === 'delayed') {
     // 延迟: 在 nextRemindTime 基础上再推迟
