@@ -29,12 +29,32 @@ const LOCK_TIMEOUT_MINUTES = 5;
  * @param {Date} now 当前时间
  */
 function calcNextRemindTime(currentNextRemindTime, intervalMinutes, now) {
-  let nextTime = new Date(new Date(currentNextRemindTime).getTime() + intervalMinutes * 60 * 1000);
-  // 循环递推直到未来，确保不落后于当前时间
-  while (nextTime.getTime() <= now.getTime()) {
-    nextTime = new Date(nextTime.getTime() + intervalMinutes * 60 * 1000);
-  }
+  // 只推进一个间隔，不循环递推
+  // 如果结果仍落后于当前时间，由 step 4y 的超时检测统一处理，避免循环事件永不超时
+  const nextTime = new Date(new Date(currentNextRemindTime).getTime() + intervalMinutes * 60 * 1000);
   return nextTime;
+}
+
+const OVERDUE_ADVANCE_MS = 5 * 60 * 1000;          // 超时任务判定阈值5分钟
+
+/**
+ * 构建循环任务的时间推进更新数据，统一超时/正常两种策略
+ * @param {boolean} isOverdue 是否处于超时推送周期
+ * @param {number} overduePushCount 当前超时推送计数
+ * @param {object} task 事项对象
+ * @param {object} extraData 额外更新字段（如 retryCount）
+ * @param {Date} now 当前时间
+ * @returns {object} update 的 data 字段
+ */
+function buildRepeatTaskUpdate(isOverdue, overduePushCount, task, extraData, now) {
+  const data = { ...extraData };
+  if (isOverdue) {
+    // 超时不修改 nextRemindTime，保持原定提醒时间不变
+    data.overduePushCount = overduePushCount + 1;
+  } else {
+    data.nextRemindTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now).toISOString();
+  }
+  return data;
 }
 
 // 订阅消息模板ID (需与微信公众平台申请的一致)
@@ -116,18 +136,18 @@ exports.main = async (event, context) => {
           }
         }
 
-        // 4y. 显著超时任务 — 不推送、不更新 nextRemindTime，等待用户手动确认
-        // 仅当超时超过 2×interval（或至少 10 分钟）才跳过，刚到期的正常推送
+        // 4y. 超时任务处理：最多推送2次，超时不修改nextRemindTime
         const remindTimeMs = new Date(task.nextRemindTime).getTime();
         const gapMs = now.getTime() - remindTimeMs;
-        const overdueThreshold = Math.max(
-          (task.intervalMinutes || 30) * 60 * 1000 * 2,
-          10 * 60 * 1000
-        );
-        if (gapMs > overdueThreshold) {
-          console.log(`[cron-scan] 事项 ${task._id} 显著超时(${Math.round(gapMs / 60000)}分钟)，跳过`);
+        const overduePushCount = task.overduePushCount || 0;
+        // 已推送2次：不再推送，等待用户手动确认
+        if (overduePushCount >= 2) {
+          console.log(`[cron-scan] 事项 ${task._id} 超时已推送${overduePushCount}次，不再推送`);
           return;
         }
+        // 标记是否处于超时推送周期中（用于后续步骤决定时间推进策略）
+        // 只有明显延迟（>5分钟）或已进入超时推送轨道，才按超时策略推进
+        const isOverdue = gapMs > OVERDUE_ADVANCE_MS || overduePushCount > 0;
 
         // 4a. 检查提醒窗口
         if (
@@ -167,9 +187,8 @@ exports.main = async (event, context) => {
               data: { hasNotified: true, retryCount: 0 },
             });
           } else {
-            const nextTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now);
             await db.collection("reminder_tasks").doc(task._id).update({
-              data: { nextRemindTime: nextTime.toISOString(), retryCount: 0 },
+              data: buildRepeatTaskUpdate(isOverdue, overduePushCount, task, { retryCount: 0 }, now),
             });
           }
           await logNotification(task, null, "success", null, 0, "red_dot_only");
@@ -188,9 +207,8 @@ exports.main = async (event, context) => {
               data: { hasNotified: true, retryCount: task.retryCount + 1 },
             });
           } else {
-            const nextTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now);
             await db.collection("reminder_tasks").doc(task._id).update({
-              data: { nextRemindTime: nextTime.toISOString(), retryCount: task.retryCount + 1 },
+              data: buildRepeatTaskUpdate(isOverdue, overduePushCount, task, { retryCount: task.retryCount + 1 }, now),
             });
           }
           await logNotification(task, null, "success", null, task.retryCount, "red_dot_retry");
@@ -244,9 +262,8 @@ exports.main = async (event, context) => {
             data: { hasNotified: true, retryCount: 0 },
           });
         } else {
-          const nextTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now);
           await db.collection("reminder_tasks").doc(task._id).update({
-            data: { nextRemindTime: nextTime.toISOString(), retryCount: 0 },
+            data: buildRepeatTaskUpdate(isOverdue, overduePushCount, task, { retryCount: 0 }, now),
           });
         }
       }),

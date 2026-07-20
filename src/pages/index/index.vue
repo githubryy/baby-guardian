@@ -320,7 +320,7 @@ function goTaskDetail(item: TimelineItem) {
 
 async function handleComplete(item: TimelineItem) {
   // 在 tap 上下文中先发起订阅授权，避免 await 后丢失手势上下文
-  const accepted = await guideBatchAuthorization('完成确认后');
+  const accepted = await guideBatchAuthorization('完成确认后', item.type);
   if (accepted === 0) return // 用户取消授权，不执行后续操作
   uni.showLoading({ title: '处理中...', mask: true });
   try {

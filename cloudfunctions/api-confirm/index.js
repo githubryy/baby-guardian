@@ -93,6 +93,8 @@ async function handleConfirm(userId, familyId, currentUser, data) {
       if (task.repeatCount > 0 && updateData.completedCount >= task.repeatCount) {
         updateData.enabled = false;
       }
+    } else {
+      updateData.enabled = false;
     }
     // 一次性任务: 不更新 nextRemindTime（已完成无需再次提醒）
     await db.collection('reminder_tasks').doc(taskId).update({ data: updateData });

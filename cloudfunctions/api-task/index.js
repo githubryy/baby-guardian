@@ -161,14 +161,14 @@ async function handleTimeline(userId, familyId, babyId) {
   const babyMap = {};
   babies.forEach((b) => { babyMap[b._id] = b; });
 
-  // 获取今日所有事项的提醒（按家庭查询）
+  // 获取今日所有事项的提醒（按家庭查询，倒序：最新时间在前）
   const { data: tasks } = await db.collection('reminder_tasks')
     .where({
       familyId,
       enabled: true,
       nextRemindTime: _.lte(todayEnd.toISOString()),
     })
-    .orderBy('nextRemindTime', 'asc')
+    .orderBy('nextRemindTime', 'desc')
     .get();
 
   // 获取今日确认记录（按家庭查询）
@@ -253,17 +253,11 @@ async function handleTimeline(userId, familyId, babyId) {
     let status = 'pending';
     if (isRecurring) {
       if (remindTime.getTime() < now.getTime()) {
+        // nextRemindTime 已过期 → 超时
         status = 'overdue';
-      } else if (!isConfirmed) {
-        // nextRemindTime 在未来但今日未操作 → cron 可能在用户无感知时推进了时间
-        // 通过 lastCompletedTime 与 nextRemindTime 的差距判断是否被 cron 推后
-        const intervalMs = (task.intervalMinutes || 0) * 60 * 1000;
-        const lastCompletedTs = task.lastCompletedTime ? new Date(task.lastCompletedTime).getTime() : 0;
-        const gap = remindTime.getTime() - lastCompletedTs;
-        // 距上次完成超过 1 个间隔 → 由 cron 推动 → 已超时
-        if (!lastCompletedTs || gap > intervalMs * 1.5) {
-          status = 'overdue';
-        }
+      } else if (!isConfirmed && task.overduePushCount > 0) {
+        // nextRemindTime 还在未来，但 cron-scan 已标记为超时推送 → 超时
+        status = 'overdue';
       }
     } else {
       // 一次性任务: 只有完成了才算已完成；忽略/延迟/结束都不算
@@ -302,6 +296,9 @@ async function handleTimeline(userId, familyId, babyId) {
       }
     });
   }
+
+  // 统一倒序排列：最新时间在前
+  timeline.sort((a, b) => new Date(b.nextRemindTime).getTime() - new Date(a.nextRemindTime).getTime());
 
   return success(timeline);
 }

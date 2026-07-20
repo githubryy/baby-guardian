@@ -3,7 +3,7 @@
  * 处理一次性订阅消息的授权与配额管理
  */
 import { SUBSCRIBE_TEMPLATES, QUOTA_EXPIRE_DAYS, CLOUD_FUNCTIONS } from './constants';
-import type { TemplateKey, QuotaSummary } from '@/types';
+import type { TemplateKey, QuotaSummary, TaskType } from '@/types';
 import { callCloud } from './request';
 
 /**
@@ -27,10 +27,17 @@ export function requestSubscribeAuthorization(
       return;
     }
 
-    const tmplIds = templates
-      .map((key) => SUBSCRIBE_TEMPLATES.find((t) => t.key === key)?.templateId)
-      .filter(Boolean) as string[];
-
+    // 构建 key → templateId 映射，避免索引错位
+    const keyToTmplId: Record<string, string> = {};
+    const tmplIds: string[] = [];
+    for (const key of templates) {
+      const t = SUBSCRIBE_TEMPLATES.find((item) => item.key === key);
+      if (t?.templateId) {
+        keyToTmplId[key] = t.templateId;
+        tmplIds.push(t.templateId);
+      }
+    }
+    console.log('tmplIds', tmplIds)
     if (tmplIds.length === 0) {
       console.warn('[订阅授权] 未配置模板ID，请先在微信公众平台申请模板');
       resolve([]);
@@ -41,16 +48,17 @@ export function requestSubscribeAuthorization(
     wx.requestSubscribeMessage({
       tmplIds,
       success(res: { [x: string]: string; }) {
+        console.log('res', res)
         subscribingLock = false;
         // res 中返回每个模板的授权结果: 'accept' | 'reject' | 'ban'
         const accepted: TemplateKey[] = [];
-        templates.forEach((key, index) => {
-          const tmplId = tmplIds[index];
-          if (res[tmplId] === 'accept') {
+        for (const key of templates) {
+          const tmplId = keyToTmplId[key];
+          if (tmplId && res[tmplId] === 'accept') {
             accepted.push(key);
           }
-        });
-
+        }
+        console.log('accepted', accepted)
         // 将授权结果上报云函数，写入配额
         if (accepted.length > 0) {
           recordSubscriptionQuota(accepted).catch((err) => {
@@ -94,12 +102,33 @@ export function getQuotaSummary(): Promise<QuotaSummary> {
 }
 
 /**
- * 在关键交互节点引导批量授权
- * P2 优化建议: 最大化单次授权收益
- * @param context 授权场景描述
+ * 根据任务类型获取对应的订阅模板 key
+ * @param taskType 任务类型
+ * @returns 该类型对应的模板 key 列表
  */
-export async function guideBatchAuthorization(context: string = '完成确认后'): Promise<number> {
-  const accepted = await requestSubscribeAuthorization(['feeding', 'care', 'medicine']);
+export function getTemplatesForType(taskType: TaskType): TemplateKey[] {
+  const keySet = new Set<TemplateKey>();
+  for (const tpl of SUBSCRIBE_TEMPLATES) {
+    if (tpl.applicableTypes.includes(taskType)) {
+      keySet.add(tpl.key);
+    }
+  }
+  return keySet.size > 0 ? Array.from(keySet) as TemplateKey[] : ['feeding', 'care', 'medicine'];
+}
+
+/**
+ * 在关键交互节点引导批量授权
+ * @param context 授权场景描述
+ * @param taskType 可选，传入时只请求该任务类型相关的模板
+ */
+export async function guideBatchAuthorization(
+  context: string = '完成确认后',
+  taskType?: TaskType
+): Promise<number> {
+  const templates: TemplateKey[] = taskType
+    ? getTemplatesForType(taskType)
+    : ['feeding', 'care', 'medicine'];
+  const accepted = await requestSubscribeAuthorization(templates);
   if (accepted.length > 0) {
     uni.showToast({
       title: `已获得${accepted.length}条提醒配额`,

@@ -360,7 +360,7 @@ async function onSave() {
       }
     } else {
       // 在 tap 上下文中先发起订阅授权，避免 await 后丢失手势上下文
-      const accepted = await guideBatchAuthorization('添加事项后');
+      const accepted = await guideBatchAuthorization('添加事项后', data.type);
       // 用户取消授权，不执行后续操作
       if (accepted === 0) return
       const ok = await taskStore.addTask(data);

@@ -293,7 +293,7 @@ async function onComplete() {
   uni.showLoading({ title: '处理中...' });
 
   // 必须在 await confirmTask 之前调用，否则丢失 TAP 手势上下文导致授权失败
-  const accepted = await guideBatchAuthorization('完成确认后');
+  const accepted = await guideBatchAuthorization('完成确认后', task.value?.type);
   if (accepted === 0) {
     submitting.value = false;
     uni.hideLoading();
