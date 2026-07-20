@@ -25,7 +25,7 @@
       </view>
     </view>
     <view class="switch-wrap" @tap.stop>
-      <u-switch v-model="enabledProxy" activeColor="#FF7B7B" size="40" />
+      <u-switch v-model="enabledProxy" activeColor="#FF7B7B" size="20" />
     </view>
   </view>
 </template>
@@ -62,7 +62,7 @@ const enabledProxy = computed({
 
 const intervalText = computed(() => durationText(props.task.intervalMinutes));
 const nextRemindText = computed(() => {
-  if (!props.task.enabled) return '已暂停';
+  if (!props.task.enabled) return '已结束';
   return relativeTime(props.task.nextRemindTime);
 });
 </script>

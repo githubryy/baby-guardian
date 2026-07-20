@@ -150,7 +150,7 @@ export const useTaskStore = defineStore('task', () => {
             const count = (item.completedCount || 0) + 1;
             item.completedCount = count;
             // 计算下次提醒时间
-            const remindDate = new Date(item.remindTime);
+            const remindDate = new Date(item.nextRemindTime);
             if (!isNaN(remindDate.getTime()) && item.intervalMinutes) {
               const nextTime = new Date(remindDate.getTime() + item.intervalMinutes * 60 * 1000);
               item.nextRemindTime = nextTime.toISOString();
@@ -169,6 +169,9 @@ export const useTaskStore = defineStore('task', () => {
           }
         } else if (data.action === 'delayed') {
           item.status = 'delayed';
+        } else if (data.action === 'ignored') {
+          // 忽略：本次跳过，状态不变（nextRemindTime 由云函数更新）
+          // loadData 重新加载后将显示正确的状态
         } else if (data.action === 'paused') {
           item.status = 'paused';
           // 同时在 taskList 中禁用该任务，使其不可恢复

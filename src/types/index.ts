@@ -315,7 +315,6 @@ export interface TimelineItem {
   typeName: string;
   typeIcon: string;
   typeColor: string;
-  remindTime: string;
   /** 距上次时长描述 */
   lastDurationText?: string;
   /** 状态: pending=待处理, completed=已完成, delayed=已延迟, overdue=已超时, paused=已结束(永久,不可恢复) */
@@ -337,8 +336,8 @@ export interface TimelineItem {
   completedCount: number;
   /** 提醒间隔(分钟) - 用于计算下次执行时间 */
   intervalMinutes?: number;
-  /** 下次提醒时间(ISO) - 循环事件完成后的下次时间 */
-  nextRemindTime?: string;
+  /** 提醒时间(ISO)，等同数据库 nextRemindTime */
+  nextRemindTime: string;
   /** 下次执行剩余时间文本 - 云函数计算下发 */
   nextRemindRemaining?: string;
 }

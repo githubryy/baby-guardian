@@ -128,7 +128,7 @@
               <text class="settings-label">操作通知</text>
               <text class="settings-desc">成员完成事项时通知其他人</text>
             </view>
-            <u-switch v-model="notifyProxy" activeColor="#FF7B7B" size="40" />
+            <u-switch v-model="notifyProxy" activeColor="#FF7B7B" size="20" />
           </view>
         </view>
       </view>

@@ -87,7 +87,7 @@
             <u-icon name="bell-fill" :size="22" color="#ef9f27" />
           </view>
           <text class="menu-text">全局推送</text>
-          <u-switch v-model="pushProxy" activeColor="#FF7B7B" size="40" />
+          <u-switch v-model="pushProxy" activeColor="#FF7B7B" size="20" />
         </view>
         <view class="menu-item tap-shrink">
           <view class="menu-icon-wrap moon-bg">

@@ -18,8 +18,7 @@
         </view>
         <view class="header-tags">
           <u-tag :text="priorityConfig.name" :type="priorityTagType" size="mini" shape="circle" plain />
-          <u-tag v-if="item.taskMode === 'recurring'" text="循环" type="info" size="mini" shape="circle" />
-          <u-tag v-if="statusTag" :text="statusTag" :type="statusTagType" size="mini" shape="circle" />
+          <u-tag v-if="item.taskMode && (item.taskMode === 'recurring')" text="循环" type="error" size="mini" shape="circle" />
         </view>
       </view>
 
@@ -28,7 +27,7 @@
           <view class="baby-info">
             <u-icon name="account-fill" :size="13" color="#aaa" />
             <text class="baby-name">{{ item.babyName }}</text>
-            <text v-if="item.lastDurationText" class="duration">
+            <text v-if="item.status === 'pending' && item.lastDurationText" class="duration">
               · 距上次 {{ item.lastDurationText }}
             </text>
           </view>
@@ -110,9 +109,9 @@ const timeText = computed(() => {
     return formatTime(props.item.completedAt);
   }
   if (props.item.status === 'overdue') {
-    return relativeTime(props.item.remindTime);
+    return relativeTime(props.item.nextRemindTime);
   }
-  return formatTime(props.item.remindTime);
+  return formatTime(props.item.nextRemindTime);
 });
 
 const safeTypeColor = computed(() => props.item.typeColor || '#999');
@@ -141,43 +140,14 @@ const recurringProgressText = computed(() => {
   return `第${count}/${repeat}次`;
 });
 
-// 下次提醒时间显示
+// 下次提醒时间显示（基于 nextRemindTime + intervalMinutes 推算）
 const nextRemindTimeDisplay = computed(() => {
   const nextTime = props.item.nextRemindTime;
-  if (!nextTime) {
-    // 如果没有 nextRemindTime，根据 remindTime + intervalMinutes 推算
-    if (props.item.intervalMinutes && props.item.remindTime) {
-      const remindDate = new Date(props.item.remindTime);
-      if (!isNaN(remindDate.getTime())) {
-        const next = new Date(remindDate.getTime() + props.item.intervalMinutes * 60 * 1000);
-        return formatTime(next.toISOString());
-      }
-    }
-    return '';
-  }
-  return formatTime(nextTime);
-});
-
-const statusTag = computed(() => {
-  const map = {
-    pending: '',
-    completed: '已完成',
-    delayed: '已延迟',
-    overdue: '已超时',
-    paused: '已结束',
-  };
-  return map[props.item.status];
-});
-
-const statusTagType = computed<'success' | 'warning' | 'error' | 'primary'>(() => {
-  const map = {
-    completed: 'success' as const,
-    delayed: 'warning' as const,
-    overdue: 'error' as const,
-    pending: 'success' as const,
-    paused: 'primary' as const,
-  };
-  return map[props.item.status];
+  if (!nextTime || !props.item.intervalMinutes) return '';
+  const remindDate = new Date(nextTime);
+  if (isNaN(remindDate.getTime())) return '';
+  const next = new Date(remindDate.getTime() + props.item.intervalMinutes * 60 * 1000);
+  return formatTime(next.toISOString());
 });
 
 const dotColor = computed(() => {

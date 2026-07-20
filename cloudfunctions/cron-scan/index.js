@@ -104,10 +104,16 @@ exports.main = async (event, context) => {
       tasks.map(async (task) => {
         processed++;
 
-        // 4z. 已完成的一次性任务 — 跳过，无需再次提醒
-        if (task.taskMode === 'once' && task.lastCompletedTime) {
-          console.log(`[cron-scan] 事项 ${task._id} 已完成的一次性任务，跳过`);
-          return;
+        // 4z. 一次性任务：已完成 / 已提醒过 → 跳过
+        if (task.taskMode === 'once') {
+          if (task.lastCompletedTime) {
+            console.log(`[cron-scan] 事项 ${task._id} 已完成的一次性任务，跳过`);
+            return;
+          }
+          if (task.hasNotified) {
+            console.log(`[cron-scan] 事项 ${task._id} 一次性任务已提醒，跳过重复通知`);
+            return;
+          }
         }
 
         // 4y. 显著超时任务 — 不推送、不更新 nextRemindTime，等待用户手动确认
@@ -155,17 +161,17 @@ exports.main = async (event, context) => {
         // 4b. P2 优先级事项 — 仅红点通知，不消耗配额
         if (task.priority === "p2") {
           console.log(`[cron-scan] 事项 ${task._id} 为P2优先级，仅红点通知`);
-          const nextTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now);
-          await db
-            .collection("reminder_tasks")
-            .doc(task._id)
-            .update({
-              data: {
-                nextRemindTime: nextTime.toISOString(),
-                retryCount: 0,
-              },
+          if (task.taskMode === 'once') {
+            // 一次性任务不推进，标记已提醒
+            await db.collection("reminder_tasks").doc(task._id).update({
+              data: { hasNotified: true, retryCount: 0 },
             });
-          // 记录日志
+          } else {
+            const nextTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now);
+            await db.collection("reminder_tasks").doc(task._id).update({
+              data: { nextRemindTime: nextTime.toISOString(), retryCount: 0 },
+            });
+          }
           await logNotification(task, null, "success", null, 0, "red_dot_only");
           return;
         }
@@ -177,24 +183,17 @@ exports.main = async (event, context) => {
           console.log(
             `[cron-scan] 事项 ${task._id} 第${task.retryCount}次重试，降级为红点`,
           );
-          const nextTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now);
-          await db
-            .collection("reminder_tasks")
-            .doc(task._id)
-            .update({
-              data: {
-                nextRemindTime: nextTime.toISOString(),
-                retryCount: task.retryCount + 1,
-              },
+          if (task.taskMode === 'once') {
+            await db.collection("reminder_tasks").doc(task._id).update({
+              data: { hasNotified: true, retryCount: task.retryCount + 1 },
             });
-          await logNotification(
-            task,
-            null,
-            "success",
-            null,
-            task.retryCount,
-            "red_dot_retry",
-          );
+          } else {
+            const nextTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now);
+            await db.collection("reminder_tasks").doc(task._id).update({
+              data: { nextRemindTime: nextTime.toISOString(), retryCount: task.retryCount + 1 },
+            });
+          }
+          await logNotification(task, null, "success", null, task.retryCount, "red_dot_retry");
           return;
         }
 
@@ -205,13 +204,17 @@ exports.main = async (event, context) => {
           quotaExhausted++;
           await logNotification(task, null, "quota_exhausted", null, 0);
 
-          const nextTime = new Date(now.getTime() + 30 * 60 * 1000);
-          await db
-            .collection("reminder_tasks")
-            .doc(task._id)
-            .update({
+          if (task.taskMode === 'once') {
+            // 一次性任务配额不足，标记已提醒，不无限重试
+            await db.collection("reminder_tasks").doc(task._id).update({
+              data: { hasNotified: true },
+            });
+          } else {
+            const nextTime = new Date(now.getTime() + 30 * 60 * 1000);
+            await db.collection("reminder_tasks").doc(task._id).update({
               data: { nextRemindTime: nextTime.toISOString() },
             });
+          }
           return;
         }
         // 4e. 向有配额的家庭成员发送订阅消息
@@ -234,17 +237,18 @@ exports.main = async (event, context) => {
           }
         }
 
-        // 4f. 更新事项: 设置下次提醒时间 + retryCount
-        const nextTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now);
-        await db
-          .collection("reminder_tasks")
-          .doc(task._id)
-          .update({
-            data: {
-              nextRemindTime: nextTime.toISOString(),
-              retryCount: 0,
-            },
+        // 4f. 更新事项
+        if (task.taskMode === 'once') {
+          // 一次性任务只提醒一次，不推进 nextRemindTime
+          await db.collection("reminder_tasks").doc(task._id).update({
+            data: { hasNotified: true, retryCount: 0 },
           });
+        } else {
+          const nextTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now);
+          await db.collection("reminder_tasks").doc(task._id).update({
+            data: { nextRemindTime: nextTime.toISOString(), retryCount: 0 },
+          });
+        }
       }),
     );
 

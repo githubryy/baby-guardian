@@ -60,7 +60,7 @@
             <text class="form-label">早产儿</text>
             <text class="form-hint">早产宝宝可设置预产期校正</text>
           </view>
-          <u-switch v-model="form.isPremature" activeColor="#FF7B7B" size="40" />
+          <u-switch v-model="form.isPremature" activeColor="#FF7B7B" size="20" />
         </view>
       </view>
 

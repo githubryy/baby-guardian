@@ -28,7 +28,7 @@
           @tap="selectedRole = role.value"
         >
           <view class="role-icon-wrap" :style="{ background: role.bgColor }">
-            <u-icon :name="role.uIcon" :size="40" :color="role.color" />
+            <u-icon :name="role.uIcon" :size="20" :color="role.color" />
           </view>
           <text class="role-name">{{ role.name }}</text>
           <text class="role-desc">{{ role.desc }}</text>

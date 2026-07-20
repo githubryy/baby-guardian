@@ -229,7 +229,7 @@ const priorityHint = computed(() => {
   return '普通事项，使用小程序内通知（不消耗配额）';
 });
 
-// 阻止选择的类型集合（只有已完成和暂停状态的事件才可以重复选择）
+// 阻止选择的类型集合（只有已完成和已结束的事件才可以重复选择）
 const activeTaskTypes = computed(() => {
   if (isEdit.value) return new Set<TaskType>(); // 编辑模式下不限制
   const babyId = babyStore.currentBabyId;

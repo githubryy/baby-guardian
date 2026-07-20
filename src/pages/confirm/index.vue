@@ -104,13 +104,13 @@
           <u-icon name="arrow-right" :size="16" color="#ccc" />
         </view>
 
-        <!-- 临时结束 -->
+        <!-- 结束该事件 -->
         <view class="action-item pause tap-feedback" @tap="onPause">
           <view class="action-icon-wrap pause-bg">
             <u-icon name="pause-circle-fill" :size="28" color="#7f77dd" />
           </view>
           <view class="action-text">
-            <text class="action-name">临时结束</text>
+            <text class="action-name">结束该事件</text>
             <text class="action-desc">永久结束该事件，不可恢复</text>
           </view>
           <u-icon name="arrow-right" :size="16" color="#ccc" />
@@ -291,6 +291,15 @@ async function onComplete() {
   if (submitting.value) return;
   submitting.value = true;
   uni.showLoading({ title: '处理中...' });
+
+  // 必须在 await confirmTask 之前调用，否则丢失 TAP 手势上下文导致授权失败
+  const accepted = await guideBatchAuthorization('完成确认后');
+  if (accepted === 0) {
+    submitting.value = false;
+    uni.hideLoading();
+    return;
+  }
+
   try {
     const ok = await taskStore.confirmTask({
       taskId: taskId.value,
@@ -301,7 +310,6 @@ async function onComplete() {
       completedCount: task.value?.completedCount,
     });
     if (ok) {
-      await guideBatchAuthorization('完成确认后');
       userStore.refreshQuota();
       // 循环事件: 提示下次执行时间
       if (task.value?.taskMode === 'recurring') {

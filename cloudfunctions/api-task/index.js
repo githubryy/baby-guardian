@@ -227,7 +227,6 @@ async function handleTimeline(userId, familyId, babyId) {
       typeName: config.name,
       typeIcon: config.icon,
       typeColor: config.color,
-      remindTime: task.nextRemindTime || task.createdAt,
       lastDurationText: task.lastCompletedTime ? getDurationText(task.lastCompletedTime) : null,
       status,
       priority: task.priority,
@@ -241,7 +240,7 @@ async function handleTimeline(userId, familyId, babyId) {
       repeatCount: task.repeatCount ?? null,
       completedCount: task.completedCount ?? null,
       intervalMinutes: task.intervalMinutes ?? null,
-      nextRemindTime: task.nextRemindTime || null,
+      nextRemindTime: task.nextRemindTime || task.createdAt,
       nextRemindRemaining: isRecurring ? getRemainingText(task.nextRemindTime) : null,
     };
   }
@@ -267,8 +266,10 @@ async function handleTimeline(userId, familyId, babyId) {
         }
       }
     } else {
-      // 一次性任务: 今天确认过 或 曾经完成过(跨天) → 已完成
-      if (isConfirmed || task.lastCompletedTime) status = 'completed';
+      // 一次性任务: 只有完成了才算已完成；忽略/延迟/结束都不算
+      const confirmAction = confirmByTask[task._id]?.action;
+      const isDone = confirmAction === 'completed';
+      if (isDone || task.lastCompletedTime) status = 'completed';
       else if (remindTime.getTime() < now.getTime()) status = 'overdue';
     }
 

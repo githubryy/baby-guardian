@@ -39,7 +39,7 @@
               <view class="skeleton skeleton-stat" />
             </view>
           </view>
-          <view class="skeleton-card" v-for="i in 3" :key="i">
+          <view class="skeleton-card" v-for="i in 3" :key="'sk-' + i">
             <view class="skeleton skeleton-line" />
             <view class="skeleton skeleton-line short" />
           </view>
@@ -358,7 +358,7 @@ async function handleDelay(item: TimelineItem) {
           taskMode: item.taskMode,
           completedCount: item.completedCount
         });
-        // loadData();
+        loadData();
       } catch (e: any) {
         console.error('[handleDelay] 操作失败:', e);
         uni.showToast({ title: '操作失败，请重试', icon: 'none' });

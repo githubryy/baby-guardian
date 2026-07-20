@@ -35,9 +35,9 @@
 
     <!-- 骨架屏 -->
     <template v-if="loading && historyList.length === 0">
-      <view class="skeleton-group" v-for="i in 3" :key="i">
+      <view class="skeleton-group" v-for="i in 3" :key="'sg-' + i">
         <view class="skeleton skeleton-date" />
-        <view class="skeleton-item" v-for="j in 3" :key="j">
+        <view class="skeleton-item" v-for="j in 3" :key="'si-' + j">
           <view class="skeleton skeleton-icon" />
           <view class="skeleton-lines">
             <view class="skeleton skeleton-line" />
@@ -55,7 +55,7 @@
           <u-tag :text="group.items.length + ' 条'" type="info" size="mini" shape="circle" plain />
         </view>
         <view class="group-items slide-up-stagger">
-          <view v-for="item in group.items" :key="item._id + item.completedTime" class="history-item">
+          <view v-for="item in group.items" :key="item._id" class="history-item">
             <view class="item-time">
               <text class="time">{{ formatTime(item.completedTime) }}</text>
             </view>
@@ -198,7 +198,7 @@ function actionText(action: ConfirmAction): string {
     completed: '已完成',
     delayed: '已延迟',
     ignored: '已忽略',
-    paused: '已暂停',
+    paused: '已结束',
   };
   return map[action] || action;
 }
