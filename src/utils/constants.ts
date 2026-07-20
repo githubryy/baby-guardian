@@ -41,7 +41,7 @@ export const TASK_TYPE_CONFIG: Record<
   },
   diaper: {
     name: "换尿布",
-    icon: "🧷",
+    icon: "🩲",
     uIcon: "tags-fill",
     color: "#378add",
     bgColor: "#E8F2FC",
@@ -61,7 +61,7 @@ export const TASK_TYPE_CONFIG: Record<
   },
   vitamin: {
     name: "维生素D",
-    icon: "💊",
+    icon: "🫧",
     uIcon: "medal-fill",
     color: "#1d9e75",
     bgColor: "#E8F7F0",
@@ -71,7 +71,7 @@ export const TASK_TYPE_CONFIG: Record<
   },
   medicine: {
     name: "用药",
-    icon: "💉",
+    icon: "💊",
     uIcon: "bookmark-fill",
     color: "#e24b4a",
     bgColor: "#FDEAEA",

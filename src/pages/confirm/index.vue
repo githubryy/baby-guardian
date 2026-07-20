@@ -165,7 +165,6 @@ const task = ref<ReminderTask>({
   reminderWindowStart: '',
   reminderWindowEnd: '',
   windowSkipStrategy: 'delay_to_next_window',
-  retryCount: 0,
   processingLock: false,
   priority: 'p0',
   taskMode: 'once',

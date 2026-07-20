@@ -7,10 +7,10 @@ const { cloud, db, _, success, fail, getOpenId, nowISO, beijingTimeToDate, isWit
 // 事项类型配置
 const TASK_TYPE_CONFIG = {
   feeding: { name: '喂养', icon: '🍼', color: '#FF7B7B', templateKey: 'feeding' },
-  diaper: { name: '换尿布', icon: '🧷', color: '#378add', templateKey: 'care' },
+  diaper: { name: '换尿布', icon: '🩲', color: '#378add', templateKey: 'care' },
   sleep: { name: '哄睡', icon: '🌙', color: '#7f77dd', templateKey: 'care' },
-  vitamin: { name: '维生素D', icon: '💊', color: '#1d9e75', templateKey: 'medicine' },
-  medicine: { name: '用药', icon: '💉', color: '#e24b4a', templateKey: 'medicine' },
+  vitamin: { name: '维生素D', icon: '🫧', color: '#1d9e75', templateKey: 'medicine' },
+  medicine: { name: '用药', icon: '💊', color: '#e24b4a', templateKey: 'medicine' },
   custom: { name: '自定义', icon: '📝', color: '#ef9f27', templateKey: null },
 };
 

@@ -108,8 +108,6 @@ export interface ReminderTask {
   reminderWindowEnd: string;
   /** 窗口跳过策略 */
   windowSkipStrategy: WindowSkipStrategy;
-  /** 重试次数 */
-  retryCount: number;
   /** 乐观锁 */
   processingLock: boolean;
   /** 锁定时间 */

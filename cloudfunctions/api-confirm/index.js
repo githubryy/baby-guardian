@@ -79,7 +79,6 @@ async function handleConfirm(userId, familyId, currentUser, data) {
       lastCompletedBy: userId,
       lastCompletedByName: currentUser.nickName,
       lastCompletedByRelation: currentUser.relation || 'other',
-      retryCount: 0,
       processingLock: false,
       lockedAt: null,
     };
@@ -119,7 +118,6 @@ async function handleConfirm(userId, familyId, currentUser, data) {
     await db.collection('reminder_tasks').doc(taskId).update({
       data: {
         nextRemindTime: nextRemind.toISOString(),
-        retryCount: 0,
         processingLock: false,
         lockedAt: null,
       },

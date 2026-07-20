@@ -1,7 +1,7 @@
 <template>
   <view class="task-item tap-shrink" :class="{ disabled: !task.enabled }" @tap="$emit('tap', task)">
     <view class="type-icon" :style="{ background: typeConfig.bgColor }">
-      <u-icon :name="typeConfig.uIcon" :size="30" :color="typeConfig.color" />
+      <u-icon :name="typeConfig.icon" :size="30" :color="typeConfig.color" />
     </view>
     <view class="task-info">
       <view class="info-header">

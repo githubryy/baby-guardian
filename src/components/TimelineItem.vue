@@ -128,7 +128,7 @@ const priorityTagType = computed<'error' | 'warning' | 'primary'>(() => {
 });
 
 const taskUIcon = computed(() => {
-  return TASK_TYPE_CONFIG[props.item.type]?.uIcon || 'edit-pen';
+  return TASK_TYPE_CONFIG[props.item.type]?.icon || 'edit-pen';
 });
 
 // 循环进度文本

@@ -35,25 +35,16 @@ function calcNextRemindTime(currentNextRemindTime, intervalMinutes, now) {
   return nextTime;
 }
 
-const OVERDUE_ADVANCE_MS = 5 * 60 * 1000;          // 超时任务判定阈值5分钟
-
 /**
- * 构建循环任务的时间推进更新数据，统一超时/正常两种策略
- * @param {boolean} isOverdue 是否处于超时推送周期
- * @param {number} overduePushCount 当前超时推送计数
+ * 构建循环任务的时间推进更新数据
  * @param {object} task 事项对象
- * @param {object} extraData 额外更新字段（如 retryCount）
  * @param {Date} now 当前时间
+ * @param {object} extraData 额外更新字段
  * @returns {object} update 的 data 字段
  */
-function buildRepeatTaskUpdate(isOverdue, overduePushCount, task, extraData, now) {
+function buildRepeatTaskUpdate(task, now, extraData = {}) {
   const data = { ...extraData };
-  if (isOverdue) {
-    // 超时不修改 nextRemindTime，保持原定提醒时间不变
-    data.overduePushCount = overduePushCount + 1;
-  } else {
-    data.nextRemindTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now).toISOString();
-  }
+  data.nextRemindTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now).toISOString();
   return data;
 }
 
@@ -136,18 +127,13 @@ exports.main = async (event, context) => {
           }
         }
 
-        // 4y. 超时任务处理：最多推送2次，超时不修改nextRemindTime
+        // 4y. 显著超时任务：跳过不推送，等待用户手动确认
+        // 加 1 分钟容差，防止 cron-scan 在提醒时刻之后小幅延迟执行导致误判
         const remindTimeMs = new Date(task.nextRemindTime).getTime();
-        const gapMs = now.getTime() - remindTimeMs;
-        const overduePushCount = task.overduePushCount || 0;
-        // 已推送2次：不再推送，等待用户手动确认
-        if (overduePushCount >= 2) {
-          console.log(`[cron-scan] 事项 ${task._id} 超时已推送${overduePushCount}次，不再推送`);
+        if (now.getTime() - remindTimeMs > 60 * 1000) {
+          console.log(`[cron-scan] 事项 ${task._id} 已超时，跳过`);
           return;
         }
-        // 标记是否处于超时推送周期中（用于后续步骤决定时间推进策略）
-        // 只有明显延迟（>5分钟）或已进入超时推送轨道，才按超时策略推进
-        const isOverdue = gapMs > OVERDUE_ADVANCE_MS || overduePushCount > 0;
 
         // 4a. 检查提醒窗口
         if (
@@ -184,34 +170,14 @@ exports.main = async (event, context) => {
           if (task.taskMode === 'once') {
             // 一次性任务不推进，标记已提醒
             await db.collection("reminder_tasks").doc(task._id).update({
-              data: { hasNotified: true, retryCount: 0 },
+              data: { hasNotified: true },
             });
           } else {
             await db.collection("reminder_tasks").doc(task._id).update({
-              data: buildRepeatTaskUpdate(isOverdue, overduePushCount, task, { retryCount: 0 }, now),
+              data: buildRepeatTaskUpdate(task, now),
             });
           }
           await logNotification(task, null, "success", null, 0, "red_dot_only");
-          return;
-        }
-
-        // 4c. P0/P1 优先级 — 使用订阅消息推送
-
-        // 重试策略: retryCount > 0 时降级为红点通知
-        if (task.retryCount > 0) {
-          console.log(
-            `[cron-scan] 事项 ${task._id} 第${task.retryCount}次重试，降级为红点`,
-          );
-          if (task.taskMode === 'once') {
-            await db.collection("reminder_tasks").doc(task._id).update({
-              data: { hasNotified: true, retryCount: task.retryCount + 1 },
-            });
-          } else {
-            await db.collection("reminder_tasks").doc(task._id).update({
-              data: buildRepeatTaskUpdate(isOverdue, overduePushCount, task, { retryCount: task.retryCount + 1 }, now),
-            });
-          }
-          await logNotification(task, null, "success", null, task.retryCount, "red_dot_retry");
           return;
         }
 
@@ -259,11 +225,11 @@ exports.main = async (event, context) => {
         if (task.taskMode === 'once') {
           // 一次性任务只提醒一次，不推进 nextRemindTime
           await db.collection("reminder_tasks").doc(task._id).update({
-            data: { hasNotified: true, retryCount: 0 },
+            data: { hasNotified: true },
           });
         } else {
           await db.collection("reminder_tasks").doc(task._id).update({
-            data: buildRepeatTaskUpdate(isOverdue, overduePushCount, task, { retryCount: 0 }, now),
+            data: buildRepeatTaskUpdate(task, now),
           });
         }
       }),
