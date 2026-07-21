@@ -21,6 +21,7 @@ const {
 
 const BATCH_LIMIT = 50;
 const LOCK_TIMEOUT_MINUTES = 5;
+const OVERDUE_TIMEOUT_MINUTES = 10;
 
 /**
  * 基于当前排定时间计算下一个提醒时间（保持对齐，防止漂移）
@@ -112,9 +113,52 @@ exports.main = async (event, context) => {
       tasks.map(async (task) => {
         processed++;
 
-        // 4z. 已推送过的超时任务：不再重复推送，等待用户手动操作
+        // 4z. 已推送过的超时任务：不再重复推送，记录超时时长，超时过长标记显著超时
         if (task.isOverdue) {
-          console.log(`[cron-scan] 事项 ${task._id} 已超时待处理，跳过`);
+          const nowTs = now.getTime();
+
+          // 首次检测到 isOverdue，记录开始时间
+          if (!task.overdueDetectedAt) {
+            console.log(`[cron-scan] 事项 ${task._id} 首次检测到超时，开始计时`);
+            await db.collection("reminder_tasks").doc(task._id).update({
+              data: { overdueDetectedAt: now.toISOString() },
+            });
+            return;
+          }
+
+          // 计算已持续的时长
+          const detectedAt = new Date(task.overdueDetectedAt).getTime();
+          const elapsedMinutes = (nowTs - detectedAt) / (60 * 1000);
+          console.log(
+            `[cron-scan] 事项 ${task._id} 已超时 ${elapsedMinutes.toFixed(1)} 分钟`,
+          );
+
+          // 超过10分钟且尚未标记显著超时
+          if (elapsedMinutes >= OVERDUE_TIMEOUT_MINUTES && !task.isCriticallyOverdue) {
+            console.log(
+              `[cron-scan] 事项 ${task._id} 超时超过${OVERDUE_TIMEOUT_MINUTES}分钟，标记显著超时`,
+            );
+            await logNotification(
+              task,
+              null,
+              "overdue_timeout",
+              { code: "OVERDUE_TIMEOUT", message: `超时超过${OVERDUE_TIMEOUT_MINUTES}分钟` },
+              0,
+              "system",
+            );
+            // 停止计时并记录显著超时标识
+            await db.collection("reminder_tasks").doc(task._id).update({
+              data: {
+                overdueDetectedAt: null,
+                isCriticallyOverdue: true,
+                overdueTimeoutAt: now.toISOString(),
+              },
+            });
+            return;
+          }
+
+          // 仍在持续计时中（未超过10分钟），跳过
+          console.log(`[cron-scan] 事项 ${task._id} 超时计时中，跳过`);
           return;
         }
 
