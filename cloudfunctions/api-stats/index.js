@@ -105,7 +105,7 @@ async function handleSummary(userId, familyId, babyId) {
 
   // 显著超时（一次查询同时得到 total 和 today）
   const { data: criticalTasks } = await db.collection('reminder_tasks')
-    .where({ ...taskQuery, isCriticallyOverdue: true })
+    .where({ ...taskQuery, isOverdueCritically: true })
     .get();
   const totalCriticallyOverdue = criticalTasks.length;
   const todayCriticallyOverdue = criticalTasks.filter(
@@ -149,7 +149,7 @@ async function handleSummary(userId, familyId, babyId) {
   const { data: weekCriticalTasks } = await db.collection('reminder_tasks')
     .where({
       ...taskQuery,
-      isCriticallyOverdue: true,
+      isOverdueCritically: true,
       overdueTimeoutAt: _.gte(weekStart.toISOString()).and(_.lte(weekEnd.toISOString())),
     })
     .get();
@@ -208,7 +208,7 @@ async function handleDaily(userId, familyId, params) {
   const { data: criticallyOverdueTasks } = await db.collection('reminder_tasks')
     .where({
       ...taskQuery,
-      isCriticallyOverdue: true,
+      isOverdueCritically: true,
       overdueTimeoutAt: _.gte(range.start.toISOString()).and(_.lte(range.end.toISOString())),
     })
     .get();

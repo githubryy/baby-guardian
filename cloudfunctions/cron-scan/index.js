@@ -134,7 +134,7 @@ exports.main = async (event, context) => {
           );
 
           // 超过10分钟且尚未标记显著超时
-          if (elapsedMinutes >= OVERDUE_TIMEOUT_MINUTES && !task.isCriticallyOverdue) {
+          if (elapsedMinutes >= OVERDUE_TIMEOUT_MINUTES && !task.isOverdueCritically) {
             console.log(
               `[cron-scan] 事项 ${task._id} 超时超过${OVERDUE_TIMEOUT_MINUTES}分钟，标记显著超时`,
             );
@@ -150,7 +150,7 @@ exports.main = async (event, context) => {
             await db.collection("reminder_tasks").doc(task._id).update({
               data: {
                 overdueDetectedAt: null,
-                isCriticallyOverdue: true,
+                isOverdueCritically: true,
                 overdueTimeoutAt: now.toISOString(),
               },
             });
