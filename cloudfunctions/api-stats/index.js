@@ -13,6 +13,37 @@ const TASK_TYPE_NAMES = {
   custom: '自定义',
 };
 
+// ========== 工具函数 ==========
+
+/** 获取某天的起止时间 */
+function dayBoundaries(d) {
+  const start = new Date(d);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(d);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
+
+/** 日期转 YYYY-MM-DD 字符串 */
+function toDateStr(d) {
+  return d.toISOString().split('T')[0];
+}
+
+/** 创建空的日统计对象 */
+function emptyDayStat(dateStr) {
+  return { date: dateStr, totalReminders: 0, completedCount: 0, delayedCount: 0, ignoredCount: 0, pausedCount: 0, criticallyOverdueCount: 0, completionRate: 0 };
+}
+
+/** 计算完成率 */
+function calcRate(completed, total) {
+  return total > 0 ? Math.round((completed / total) * 100) : 0;
+}
+
+/** 构建事项查询条件 */
+function buildTaskQuery(familyId, babyId, extra = {}) {
+  return babyId ? { familyId, babyId, ...extra } : { familyId, ...extra };
+}
+
 exports.main = async (event, context) => {
   const { action } = event;
   const openId = getOpenId(event);
@@ -33,7 +64,7 @@ exports.main = async (event, context) => {
       case 'daily':
         return await handleDaily(userId, familyId, event.params);
       case 'byType':
-        return await handleByType(userId, familyId, event.params);
+        return success(await getTypeStats(familyId, event.params.startDate, event.params.endDate, event.params.babyId));
       default:
         return fail(`未知操作: ${action}`);
     }
@@ -46,177 +77,195 @@ exports.main = async (event, context) => {
 /** 获取统计概览 */
 async function handleSummary(userId, familyId, babyId) {
   const now = new Date();
-  const todayStart = new Date(now);
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(now);
-  todayEnd.setHours(23, 59, 59, 999);
+  const today = dayBoundaries(now);
 
-  // 宝宝数量（按家庭查询）
+  // 宝宝数量
   const babyQuery = babyId
     ? _.or([{ familyId, _id: babyId }, { userId: familyId, _id: babyId }])
     : _.or([{ familyId }, { userId: familyId }]);
-  const { total: totalBabies } = await db.collection('babies')
-    .where(babyQuery)
-    .count();
+  const { total: totalBabies } = await db.collection('babies').where(babyQuery).count();
 
-  // 事项数量（按家庭查询）
-  const taskQuery = babyId ? { familyId, babyId } : { familyId };
-  const { total: totalTasks } = await db.collection('reminder_tasks')
-    .where(taskQuery)
-    .count();
-  const { total: activeTasks } = await db.collection('reminder_tasks')
-    .where({ ...taskQuery, enabled: true })
-    .count();
+  // 事项数量
+  const taskQuery = buildTaskQuery(familyId, babyId);
+  const { total: totalTasks } = await db.collection('reminder_tasks').where(taskQuery).count();
+  const { total: activeTasks } = await db.collection('reminder_tasks').where({ ...taskQuery, enabled: true }).count();
 
   // 今日提醒数
   const { data: todayTasks } = await db.collection('reminder_tasks')
-    .where({
-      ...taskQuery,
-      enabled: true,
-      nextRemindTime: _.lte(todayEnd.toISOString()),
-    })
+    .where({ ...taskQuery, enabled: true, nextRemindTime: _.lte(today.end.toISOString()) })
     .get();
   const todayReminders = todayTasks.length;
 
-  // 今日已完成（按家庭查询）
+  // 今日已完成
   const { data: todayLogs } = await db.collection('confirm_logs')
-    .where({
-      familyId,
-      action: 'completed',
-      completedTime: _.gte(todayStart.toISOString()),
-    })
+    .where({ familyId, action: 'completed', completedTime: _.gte(today.start.toISOString()) })
     .get();
   const todayCompleted = todayLogs.length;
+  const todayCompletionRate = calcRate(todayCompleted, todayReminders);
 
-  const todayCompletionRate = todayReminders > 0
-    ? Math.round((todayCompleted / todayReminders) * 100)
-    : 0;
+  // 显著超时（一次查询同时得到 total 和 today）
+  const { data: criticalTasks } = await db.collection('reminder_tasks')
+    .where({ ...taskQuery, isCriticallyOverdue: true })
+    .get();
+  const totalCriticallyOverdue = criticalTasks.length;
+  const todayCriticallyOverdue = criticalTasks.filter(
+    (t) => t.overdueTimeoutAt >= today.start.toISOString()
+  ).length;
 
-  // 获取最近7天统计（按家庭查询）
-  const dates = [];
-  for (let i = 6; i >= 0; i--) {
+  // 暂停事件（一次查询同时得到 total 和 today）
+  const { data: pausedLogs } = await db.collection('confirm_logs')
+    .where({ familyId, action: 'paused' })
+    .get();
+  const totalPaused = pausedLogs.length;
+  const todayPaused = pausedLogs.filter(
+    (l) => l.completedTime >= today.start.toISOString()
+  ).length;
+
+  // 总完成事件
+  const { total: totalCompleted } = await db.collection('confirm_logs')
+    .where({ familyId, action: 'completed' })
+    .count();
+
+  const totalEvents = totalCompleted + totalPaused + totalCriticallyOverdue;
+
+  // 最近 7 天日期
+  const dates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
-    d.setDate(d.getDate() - i);
-    dates.push(d);
-  }
+    d.setDate(d.getDate() - (6 - i));
+    return d;
+  });
+  const weekStart = dayBoundaries(dates[0]).start;
+  const weekEnd = dayBoundaries(dates[6]).end;
 
-  const weeklyStats = await Promise.all(dates.map(async (d) => {
-    const dayStart = new Date(d);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(d);
-    dayEnd.setHours(23, 59, 59, 999);
+  // 一次查询整周 confirm_logs
+  const { data: weekLogs } = await db.collection('confirm_logs')
+    .where({
+      familyId,
+      completedTime: _.gte(weekStart.toISOString()).and(_.lte(weekEnd.toISOString())),
+    })
+    .get();
 
-    const { data: dayLogs } = await db.collection('confirm_logs')
-      .where({
-        familyId,
-        completedTime: _.gte(dayStart.toISOString()).and(_.lte(dayEnd.toISOString())),
-      })
-      .get();
+  // 一次查询整周显著超时
+  const { data: weekCriticalTasks } = await db.collection('reminder_tasks')
+    .where({
+      ...taskQuery,
+      isCriticallyOverdue: true,
+      overdueTimeoutAt: _.gte(weekStart.toISOString()).and(_.lte(weekEnd.toISOString())),
+    })
+    .get();
 
-    const completed = dayLogs.filter((l) => l.action === 'completed').length;
-    const delayed = dayLogs.filter((l) => l.action === 'delayed').length;
-    const ignored = dayLogs.filter((l) => l.action === 'ignored').length;
+  // 按日期分组
+  const weekMap = {};
+  dates.forEach((d) => { weekMap[toDateStr(d)] = emptyDayStat(toDateStr(d)); });
 
-    return {
-      date: dayStart.toISOString().split('T')[0],
-      totalReminders: dayLogs.length,
-      completedCount: completed,
-      delayedCount: delayed,
-      ignoredCount: ignored,
-      completionRate: dayLogs.length > 0 ? Math.round((completed / dayLogs.length) * 100) : 0,
-    };
+  weekLogs.forEach((l) => {
+    const dateKey = toDateStr(new Date(l.completedTime));
+    if (weekMap[dateKey]) {
+      weekMap[dateKey].totalReminders++;
+      if (l.action === 'completed') weekMap[dateKey].completedCount++;
+      else if (l.action === 'delayed') weekMap[dateKey].delayedCount++;
+      else if (l.action === 'ignored') weekMap[dateKey].ignoredCount++;
+      else if (l.action === 'paused') weekMap[dateKey].pausedCount++;
+    }
+  });
+
+  weekCriticalTasks.forEach((t) => {
+    const dateKey = toDateStr(new Date(t.overdueTimeoutAt));
+    if (weekMap[dateKey]) weekMap[dateKey].criticallyOverdueCount++;
+  });
+
+  const weeklyStats = Object.values(weekMap).map((day) => ({
+    ...day,
+    completionRate: calcRate(day.completedCount, day.totalReminders),
   }));
 
   // 类型统计
-  const typeStats = await getTypeStats(familyId, dates[0].toISOString(), now.toISOString());
+  const typeStats = await getTypeStats(familyId, weekStart.toISOString(), now.toISOString(), babyId);
 
   return success({
-    totalBabies,
-    totalTasks,
-    activeTasks,
-    todayReminders,
-    todayCompleted,
-    todayCompletionRate,
-    weeklyStats,
-    typeStats,
+    totalBabies, totalTasks, activeTasks,
+    todayReminders, todayCompleted, todayCompletionRate,
+    todayCriticallyOverdue, totalCriticallyOverdue,
+    todayPaused, totalPaused,
+    totalCompleted, totalEvents,
+    weeklyStats, typeStats,
   });
 }
 
 /** 日统计（按家庭查询） */
 async function handleDaily(userId, familyId, params) {
   const { babyId, startDate, endDate } = params;
-  const start = new Date(startDate);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(endDate);
-  end.setHours(23, 59, 59, 999);
+  const range = dayBoundaries(new Date(startDate));
+  range.end = dayBoundaries(new Date(endDate)).end;
 
-  const query = {
-    familyId,
-    completedTime: _.gte(start.toISOString()).and(_.lte(end.toISOString())),
-  };
+  const taskQuery = buildTaskQuery(familyId, babyId);
+
+  const query = { familyId, completedTime: _.gte(range.start.toISOString()).and(_.lte(range.end.toISOString())) };
   if (babyId) query.babyId = babyId;
 
-  const { data: logs } = await db.collection('confirm_logs')
-    .where(query)
-    .orderBy('completedTime', 'asc')
+  const { data: logs } = await db.collection('confirm_logs').where(query).orderBy('completedTime', 'asc').get();
+
+  const { data: criticallyOverdueTasks } = await db.collection('reminder_tasks')
+    .where({
+      ...taskQuery,
+      isCriticallyOverdue: true,
+      overdueTimeoutAt: _.gte(range.start.toISOString()).and(_.lte(range.end.toISOString())),
+    })
     .get();
 
-  // 按日期分组
   const dayMap = {};
-  logs.forEach((log) => {
-    const date = log.completedTime.split('T')[0];
-    if (!dayMap[date]) {
-      dayMap[date] = { date, totalReminders: 0, completedCount: 0, delayedCount: 0, ignoredCount: 0, completionRate: 0 };
-    }
-    dayMap[date].totalReminders++;
-    if (log.action === 'completed') dayMap[date].completedCount++;
-    else if (log.action === 'delayed') dayMap[date].delayedCount++;
-    else if (log.action === 'ignored') dayMap[date].ignoredCount++;
+  const ensureDay = (dateStr) => {
+    if (!dayMap[dateStr]) dayMap[dateStr] = emptyDayStat(dateStr);
+    return dayMap[dateStr];
+  };
+
+  logs.forEach((l) => {
+    const day = ensureDay(toDateStr(new Date(l.completedTime)));
+    day.totalReminders++;
+    if (l.action === 'completed') day.completedCount++;
+    else if (l.action === 'delayed') day.delayedCount++;
+    else if (l.action === 'ignored') day.ignoredCount++;
+    else if (l.action === 'paused') day.pausedCount++;
   });
 
-  Object.values(dayMap).forEach((day) => {
-    day.completionRate = day.totalReminders > 0
-      ? Math.round((day.completedCount / day.totalReminders) * 100)
-      : 0;
+  criticallyOverdueTasks.forEach((t) => {
+    const day = ensureDay(toDateStr(new Date(t.overdueTimeoutAt || t.createdAt)));
+    day.criticallyOverdueCount++;
   });
+
+  Object.values(dayMap).forEach((d) => { d.completionRate = calcRate(d.completedCount, d.totalReminders); });
 
   return success(Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date)));
 }
 
 /** 类型统计 */
-async function handleByType(userId, familyId, params) {
-  const { babyId, startDate, endDate } = params;
-  return success(await getTypeStats(familyId, startDate, endDate, babyId));
-}
-
 async function getTypeStats(familyId, startDate, endDate, babyId) {
-  const query = {
-    familyId,
-    completedTime: _.gte(startDate).and(_.lte(endDate)),
-  };
+  const query = { familyId, completedTime: _.gte(startDate).and(_.lte(endDate)) };
   if (babyId) query.babyId = babyId;
 
-  const { data: logs } = await db.collection('confirm_logs')
-    .where(query)
-    .get();
+  const { data: logs } = await db.collection('confirm_logs').where(query).get();
 
-  // 需要关联 task 获取类型
-  const taskIdSet = new Set(logs.map((l) => l.taskId));
+  // 批量获取关联事项类型
+  const taskIds = [...new Set(logs.map((l) => l.taskId))];
   const taskTypeMap = {};
-  for (const taskId of taskIdSet) {
-    try {
-      const { data: task } = await db.collection('reminder_tasks').doc(taskId).get();
-      taskTypeMap[taskId] = task.type;
-    } catch (e) {
-      // 事项可能已删除
+  if (taskIds.length > 0) {
+    // 微信云开发 _.in 单次最多 100 条
+    const chunks = [];
+    for (let i = 0; i < taskIds.length; i += 100) {
+      chunks.push(taskIds.slice(i, i + 100));
     }
+    const results = await Promise.all(chunks.map((ids) =>
+      db.collection('reminder_tasks').where({ _id: _.in(ids) }).get()
+    ));
+    results.forEach(({ data }) => {
+      data.forEach((t) => { taskTypeMap[t._id] = t.type; });
+    });
   }
 
   const typeCountMap = {};
-  logs.forEach((log) => {
-    const type = taskTypeMap[log.taskId] || 'custom';
-    if (!typeCountMap[type]) typeCountMap[type] = 0;
-    typeCountMap[type]++;
+  logs.forEach((l) => {
+    const type = taskTypeMap[l.taskId] || 'custom';
+    typeCountMap[type] = (typeCountMap[type] || 0) + 1;
   });
 
   const total = Object.values(typeCountMap).reduce((a, b) => a + b, 0);

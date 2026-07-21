@@ -8,59 +8,87 @@
       </view>
     </view>
 
-    <!-- 概览卡片 - 环形进度 -->
+    <!-- 概览卡片 - 四类事件统计 -->
     <view class="overview-card slide-up">
-      <view class="ring-section">
-        <!-- 环形进度 -->
-        <view class="progress-ring">
-          <view class="ring-bg" />
-          <view class="ring-fill" :style="ringStyle" />
-          <view class="ring-content">
-            <text class="ring-num">{{ summary.todayCompletionRate }}</text>
-            <text class="ring-percent">%</text>
-            <text class="ring-label">完成率</text>
+      <view class="card-title">
+        <u-icon name="calendar-fill" :size="18" color="#FF7B7B" />
+        <text>事件统计概览</text>
+        <text class="title-hint">今日 / 总计</text>
+      </view>
+      <view class="event-grid">
+        <!-- 显著超时事件 -->
+        <view class="event-card critical">
+          <view class="ec-icon-box" style="background: linear-gradient(135deg, #ee6a69, #e24b4a)">
+            <u-icon name="error-circle-fill" :size="28" color="#fff" />
+          </view>
+          <view class="ec-body">
+            <text class="ec-num critical">{{ summary.todayCriticallyOverdue }}</text>
+            <text class="ec-total">总计 {{ summary.totalCriticallyOverdue }}</text>
+            <text class="ec-label">显著超时事件</text>
           </view>
         </view>
-        <!-- 统计数据 -->
-        <view class="ring-stats">
-          <view class="ring-stat-item">
-            <text class="rs-num">{{ summary.todayReminders }}</text>
-            <text class="rs-label">总提醒</text>
+        <!-- 暂停事件 -->
+        <view class="event-card paused">
+          <view class="ec-icon-box" style="background: linear-gradient(135deg, #f5b547, #ef9f27)">
+            <u-icon name="pause-circle-fill" :size="28" color="#fff" />
           </view>
-          <view class="ring-stat-item">
-            <text class="rs-num green">{{ summary.todayCompleted }}</text>
-            <text class="rs-label">已完成</text>
+          <view class="ec-body">
+            <text class="ec-num paused">{{ summary.todayPaused }}</text>
+            <text class="ec-total">总计 {{ summary.totalPaused }}</text>
+            <text class="ec-label">暂停事件</text>
           </view>
-          <view class="ring-stat-item">
-            <text class="rs-num red">{{ summary.todayReminders - summary.todayCompleted }}</text>
-            <text class="rs-label">未完成</text>
+        </view>
+        <!-- 已完成事件 -->
+        <view class="event-card completed">
+          <view class="ec-icon-box" style="background: linear-gradient(135deg, #28b886, #1d9e75)">
+            <u-icon name="checkmark-circle-fill" :size="28" color="#fff" />
           </view>
-          <view class="ring-stat-item">
-            <text class="rs-num blue">{{ summary.activeTasks }}</text>
-            <text class="rs-label">活跃事项</text>
+          <view class="ec-body">
+            <text class="ec-num completed">{{ summary.todayCompleted }}</text>
+            <text class="ec-total">总计 {{ summary.totalCompleted ?? summary.todayCompleted }}</text>
+            <text class="ec-label">已完成事件</text>
+          </view>
+        </view>
+        <!-- 总事件统计 -->
+        <view class="event-card total">
+          <view class="ec-icon-box" style="background: linear-gradient(135deg, #5b7fff, #3d5bdb)">
+            <u-icon name="grid-fill" :size="28" color="#fff" />
+          </view>
+          <view class="ec-body">
+            <text class="ec-num total">{{ summary.totalEvents }}</text>
+            <text class="ec-total">今日完成 {{ summary.todayCompletionRate }}%</text>
+            <text class="ec-label">总事件统计</text>
           </view>
         </view>
       </view>
     </view>
 
-    <!-- 趋势图 -->
+    <!-- 事件趋势图 -->
     <view class="chart-card slide-up" style="animation-delay: 0.1s">
       <view class="chart-title">
         <u-icon name="calendar-fill" :size="18" color="#FF7B7B" />
-        <text>{{ periodLabel }}趋势</text>
+        <text>{{ periodLabel }}事件趋势</text>
       </view>
       <view class="bar-chart">
         <view v-for="(stat, index) in chartData" :key="index" class="bar-item">
+          <!-- 总数标签 -->
+          <text class="bar-total-num">{{ totalForDay(stat) }}</text>
+          <!-- 堆叠柱 -->
           <view class="bar-track">
-            <view class="bar-fill" :style="{
-              height: getBarHeight(stat.completionRate) + '%',
-              background: stat.completionRate >= 80 ? 'linear-gradient(180deg, #28b886, #1d9e75)' : stat.completionRate >= 50 ? 'linear-gradient(180deg, #f5b547, #ef9f27)' : 'linear-gradient(180deg, #ee6a69, #e24b4a)',
-              animationDelay: index * 0.05 + 's'
-            }" />
+            <view class="bar-stack-wrap">
+              <view class="bar-fill-comp" :style="{ height: getStackHeight(stat.completedCount, stat) + '%', background: 'linear-gradient(180deg, #28b886, #1d9e75)', animationDelay: index * 0.05 + 's' }" />
+              <view class="bar-fill-comp" :style="{ height: getStackHeight(stat.pausedCount || 0, stat) + '%', background: 'linear-gradient(180deg, #f5b547, #ef9f27)', animationDelay: (index * 0.05 + 0.1) + 's' }" />
+              <view class="bar-fill-comp" :style="{ height: getStackHeight(stat.criticallyOverdueCount || 0, stat) + '%', background: 'linear-gradient(180deg, #ee6a69, #e24b4a)', animationDelay: (index * 0.05 + 0.2) + 's' }" />
+            </view>
           </view>
           <text class="bar-label">{{ stat.date.slice(5) }}</text>
-          <text class="bar-value" :style="{ color: stat.completionRate >= 80 ? '#1d9e75' : stat.completionRate >= 50 ? '#ef9f27' : '#e24b4a' }">{{ stat.completionRate }}%</text>
         </view>
+      </view>
+      <!-- 图例 -->
+      <view class="chart-legend">
+        <view class="legend-item"><view class="legend-dot comp" /><text>已完成</text></view>
+        <view class="legend-item"><view class="legend-dot pause" /><text>暂停</text></view>
+        <view class="legend-item"><view class="legend-dot crit" /><text>显著超时</text></view>
       </view>
     </view>
 
@@ -136,6 +164,12 @@ const summary = ref<StatsSummary>({
   todayReminders: 0,
   todayCompleted: 0,
   todayCompletionRate: 0,
+  todayCriticallyOverdue: 0,
+  totalCriticallyOverdue: 0,
+  todayPaused: 0,
+  totalPaused: 0,
+  totalCompleted: 0,
+  totalEvents: 0,
   weeklyStats: [],
   typeStats: [],
 });
@@ -147,18 +181,10 @@ const periodTabs = [
 
 const periodLabel = computed(() => activePeriod.value === 'week' ? '本周' : '本月');
 
-const ringStyle = computed(() => {
-  const percent = summary.value.todayCompletionRate;
-  const color = percent >= 80 ? '#1d9e75' : percent >= 50 ? '#ef9f27' : '#e24b4a';
-  return {
-    background: `conic-gradient(${color} ${percent * 3.6}deg, #f0f0f0 ${percent * 3.6}deg)`,
-  };
-});
-
 const chartData = computed(() => {
   return summary.value.weeklyStats.length > 0
     ? summary.value.weeklyStats
-    : getRecentDates(7).map(date => ({ date, totalReminders: 0, completedCount: 0, delayedCount: 0, ignoredCount: 0, completionRate: 0 }));
+    : getRecentDates(7).map(date => ({ date, totalReminders: 0, completedCount: 0, delayedCount: 0, ignoredCount: 0, pausedCount: 0, criticallyOverdueCount: 0, completionRate: 0 }));
 });
 
 onMounted(() => {
@@ -186,8 +212,20 @@ async function loadData() {
   }
 }
 
-function getBarHeight(rate: number): number {
-  return Math.max(5, rate);
+function getMaxForDay(stat: Record<string, any>): number {
+  const comp = Number(stat.completedCount) || 0;
+  const pause = Number(stat.pausedCount) || 0;
+  const crit = Number(stat.criticallyOverdueCount) || 0;
+  return Math.max(comp + pause + crit, 1);
+}
+
+function getStackHeight(count: number, stat: Record<string, any>): number {
+  const max = getMaxForDay(stat);
+  return Math.max((count / max) * 100, count > 0 ? 5 : 0);
+}
+
+function totalForDay(stat: Record<string, any>): number {
+  return (Number(stat.completedCount) || 0) + (Number(stat.pausedCount) || 0) + (Number(stat.criticallyOverdueCount) || 0);
 }
 
 function getTaskUIcon(type: TaskType): string {
@@ -240,86 +278,77 @@ function getTaskColor(type: TaskType | string): string {
   margin-bottom: 24rpx;
   box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
 
-  .ring-section {
+  .card-title {
     display: flex;
     align-items: center;
-    gap: 32rpx;
+    gap: 8rpx;
+    font-size: 30rpx;
+    font-weight: 600;
+    color: #2d2d2d;
+    margin-bottom: 24rpx;
 
-    .progress-ring {
-      position: relative;
-      width: 160rpx;
-      height: 160rpx;
-      flex-shrink: 0;
+    .title-hint {
+      margin-left: auto;
+      font-size: 22rpx;
+      font-weight: 400;
+      color: #aaa;
+    }
+  }
 
-      .ring-bg {
-        position: absolute;
-        inset: 0;
-        border-radius: 50%;
-        background: #f5f5f5;
+  .event-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16rpx;
+
+    .event-card {
+      background: #fafafa;
+      border-radius: 16rpx;
+      padding: 20rpx;
+      display: flex;
+      align-items: center;
+      gap: 16rpx;
+      transition: transform 0.2s, box-shadow 0.2s;
+
+      &:active {
+        transform: scale(0.97);
       }
 
-      .ring-fill {
-        position: absolute;
-        inset: 0;
-        border-radius: 50%;
-        transition: background 0.5s ease;
-      }
-
-      .ring-content {
-        position: absolute;
-        inset: 16rpx;
-        border-radius: 50%;
-        background: #fff;
+      .ec-icon-box {
+        width: 64rpx;
+        height: 64rpx;
+        border-radius: 16rpx;
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
-
-        .ring-num {
-          font-size: 48rpx;
-          font-weight: 700;
-          color: #2d2d2d;
-          font-variant-numeric: tabular-nums;
-          line-height: 1;
-        }
-
-        .ring-percent {
-          font-size: 24rpx;
-          color: #999;
-          line-height: 1;
-        }
-
-        .ring-label {
-          font-size: 20rpx;
-          color: #aaa;
-          margin-top: 4rpx;
-        }
+        flex-shrink: 0;
       }
-    }
 
-    .ring-stats {
-      flex: 1;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16rpx;
-
-      .ring-stat-item {
+      .ec-body {
+        flex: 1;
         display: flex;
         flex-direction: column;
-        align-items: center;
+        min-width: 0;
 
-        .rs-num {
-          font-size: 36rpx;
+        .ec-num {
+          font-size: 40rpx;
           font-weight: 700;
-          color: #2d2d2d;
           font-variant-numeric: tabular-nums;
+          line-height: 1.1;
 
-          &.green { color: #1d9e75; }
-          &.red { color: #e24b4a; }
-          &.blue { color: #378add; }
+          &.critical { color: #e24b4a; }
+          &.paused { color: #ef9f27; }
+          &.completed { color: #1d9e75; }
+          &.total { color: #5b7fff; }
         }
 
-        .rs-label {
+        .ec-total {
+          font-size: 20rpx;
+          color: #bbb;
+          margin-top: 2rpx;
+          line-height: 1.3;
+        }
+
+        .ec-label {
           font-size: 22rpx;
           color: #999;
           margin-top: 4rpx;
@@ -349,7 +378,7 @@ function getTaskColor(type: TaskType | string): string {
   .bar-chart {
     display: flex;
     gap: 8rpx;
-    height: 260rpx;
+    height: 280rpx;
     align-items: flex-end;
 
     .bar-item {
@@ -358,18 +387,36 @@ function getTaskColor(type: TaskType | string): string {
       flex-direction: column;
       align-items: center;
 
+      .bar-total-num {
+        font-size: 18rpx;
+        font-weight: 600;
+        color: #666;
+        margin-bottom: 4rpx;
+        font-variant-numeric: tabular-nums;
+      }
+
       .bar-track {
         width: 100%;
-        height: 180rpx;
+        height: 200rpx;
         display: flex;
         align-items: flex-end;
         justify-content: center;
 
-        .bar-fill {
+        .bar-stack-wrap {
           width: 70%;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-end;
           border-radius: 8rpx 8rpx 0 0;
-          min-height: 8rpx;
-          animation: barGrow 0.5s ease both;
+          overflow: hidden;
+
+          .bar-fill-comp {
+            width: 100%;
+            min-height: 0;
+            transition: height 0.4s ease;
+            animation: barGrow 0.5s ease both;
+          }
         }
       }
 
@@ -378,10 +425,32 @@ function getTaskColor(type: TaskType | string): string {
         color: #aaa;
         margin-top: 8rpx;
       }
+    }
+  }
 
-      .bar-value {
-        font-size: 18rpx;
-        font-weight: 600;
+  .chart-legend {
+    display: flex;
+    justify-content: center;
+    gap: 32rpx;
+    margin-top: 20rpx;
+    padding-top: 16rpx;
+    border-top: 1rpx solid #f0f0f0;
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6rpx;
+      font-size: 22rpx;
+      color: #999;
+
+      .legend-dot {
+        width: 14rpx;
+        height: 14rpx;
+        border-radius: 4rpx;
+
+        &.comp { background: #1d9e75; }
+        &.pause { background: #ef9f27; }
+        &.crit { background: #e24b4a; }
       }
     }
   }

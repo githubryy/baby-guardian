@@ -276,6 +276,8 @@ export interface DailyStat {
   completedCount: number;
   delayedCount: number;
   ignoredCount: number;
+  pausedCount: number;
+  criticallyOverdueCount: number;
   /** 完成率 */
   completionRate: number;
 }
@@ -296,6 +298,16 @@ export interface StatsSummary {
   todayReminders: number;
   todayCompleted: number;
   todayCompletionRate: number;
+  /** 显著超时事件数 */
+  todayCriticallyOverdue: number;
+  totalCriticallyOverdue: number;
+  /** 暂停事件数 */
+  todayPaused: number;
+  totalPaused: number;
+  /** 已完成事件总数 */
+  totalCompleted: number;
+  /** 总事件数（已完成+暂停+显著超时） */
+  totalEvents: number;
   weeklyStats: DailyStat[];
   typeStats: TypeStat[];
 }
