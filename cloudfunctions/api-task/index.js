@@ -280,9 +280,8 @@ async function handleTimeline(userId, familyId, babyId) {
       if (pausedTaskIds.has(task._id)) {
         timeline.push(buildItem(task, { status: 'paused' }));
       } else {
-        const isRecurring = task.taskMode === 'recurring';
-        const status = task.enabled ? ((isRecurring && !confirmedTaskIds.has(task._id)) ? 'overdue' : 'completed') : 'paused';
-        timeline.push(buildItem(task, { status, isRecurring }));
+        // 非暂停的补充任务，一定来自今日确认记录，状态为 completed
+        timeline.push(buildItem(task, { status: 'completed', isRecurring: task.taskMode === 'recurring' }));
       }
     });
   }

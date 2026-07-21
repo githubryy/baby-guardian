@@ -39,10 +39,11 @@ exports.main = async (event, context) => {
 async function handleConfirm(userId, familyId, currentUser, data) {
   const { taskId, action, delayMinutes, remark, taskType, taskName } = data;
   const now = nowISO();
-  const completedCount = action === 'completed' ? ((task.completedCount || 0) + 1 ): task.completedCount
   // 获取事项
   const { data: task } = await db.collection('reminder_tasks').doc(taskId).get();
   if (!task) return fail('事项不存在');
+
+  const completedCount = action === 'completed' ? ((task.completedCount || 0) + 1) : task.completedCount;
 
   // 写入确认日志（含操作人信息 + 事项类型/名称，由前端传入）
   const log = {
@@ -80,13 +81,13 @@ async function handleConfirm(userId, familyId, currentUser, data) {
       isOverdue: false,
       processingLock: false,
       lockedAt: null,
+      completedCount
     };
     if (task.taskMode === 'recurring') {
       // 循环事件: 计算下次提醒时间 + 递增 completedCount
       const nextRemind = new Date();
       nextRemind.setMinutes(nextRemind.getMinutes() + task.intervalMinutes);
       updateData.nextRemindTime = nextRemind.toISOString();
-      updateData.completedCount = completedCount;
       // 有限循环且已完成全部次数 → 自动停用
       if (task.repeatCount > 0 && updateData.completedCount >= task.repeatCount) {
         updateData.enabled = false;

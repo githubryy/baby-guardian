@@ -20,7 +20,7 @@
 
     <!-- 事项列表 -->
     <view v-if="filteredList.length > 0" class="task-list slide-up-stagger">
-      <TaskItem v-for="task in filteredList" :key="task._id" :task="task" @tap="onEditTask"
+      <TaskItem v-for="task in filteredList" :key="task._id" :task="task" @itemTap="onEditTask"
         @toggle="onToggle" />
     </view>
 

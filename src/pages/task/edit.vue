@@ -188,6 +188,7 @@ import { ref, computed, watch } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
 import { useTaskStore } from '@/stores/task';
 import { useBabyStore } from '@/stores/baby';
+import { getTaskDetail } from '@/api/task';
 import { TASK_TYPE_OPTIONS, PRIORITY_OPTIONS, TASK_TYPE_CONFIG, DEFAULT_WINDOW } from '@/utils/constants';
 import { guideBatchAuthorization } from '@/utils/subscribe';
 import type { TaskType, TaskPriority, WindowSkipStrategy, TaskMode } from '@/types';
@@ -281,6 +282,7 @@ watch(activeTaskTypes, (disabledTypes) => {
 }, { immediate: true });
 
 onLoad((options) => {
+  // options 为空表示"添加事项"模式，有 id 表示"编辑事项"模式
   if (options?.id) {
     isEdit.value = true;
     editId.value = options.id;
@@ -288,8 +290,17 @@ onLoad((options) => {
   }
 });
 
-function loadTaskDetail() {
-  const task = taskStore.taskList.find((t) => t._id === editId.value);
+async function loadTaskDetail() {
+  // 先从本地 store 查找，找不到则从服务端拉取
+  let task = taskStore.taskList.find((t) => t._id === editId.value);
+  if (!task) {
+    try {
+      task = await getTaskDetail(editId.value);
+    } catch {
+      uni.showToast({ title: '加载事项失败', icon: 'none' });
+      return;
+    }
+  }
   if (task) {
     form.value = {
       type: task.type,
@@ -303,6 +314,7 @@ function loadTaskDetail() {
       taskMode: task.taskMode || 'once',
       repeatCount: task.repeatCount ?? -1,
     };
+    !intervalPresets.some((p) => p.value === task.intervalMinutes) && (customIntervalStr.value = String(task.intervalMinutes))
     uni.setNavigationBarTitle({ title: '编辑事项' });
   }
 }
@@ -708,5 +720,6 @@ async function onDelete() {
   padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
   background: #fff;
   box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04);
+  z-index: 1000;
 }
 </style>
