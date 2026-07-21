@@ -9,7 +9,7 @@ const TASK_TYPE_CONFIG = {
   feeding: { name: '喂养', icon: '🍼', color: '#FF7B7B', templateKey: 'feeding' },
   diaper: { name: '换尿布', icon: '🩲', color: '#378add', templateKey: 'care' },
   sleep: { name: '哄睡', icon: '🌙', color: '#7f77dd', templateKey: 'care' },
-  vitamin: { name: '维生素D', icon: '🫧', color: '#1d9e75', templateKey: 'medicine' },
+  vitamin: { name: '维生素D', icon: '🇩', color: '#1d9e75', templateKey: 'medicine' },
   medicine: { name: '用药', icon: '💊', color: '#e24b4a', templateKey: 'medicine' },
   custom: { name: '自定义', icon: '📝', color: '#ef9f27', templateKey: null },
 };
@@ -102,9 +102,9 @@ async function handleAdd(userId, familyId, data) {
     lastCompletedBy: null,
     lastCompletedByName: null,
     lastCompletedByRelation: null,
-    retryCount: 0,
     processingLock: false,
     lockedAt: null,
+    isOverdue: false,
     completedCount: data.taskMode === 'recurring' ? 0 : null,
     createdAt: nowIso,
   };
@@ -251,48 +251,38 @@ async function handleTimeline(userId, familyId, babyId) {
     const isConfirmed = confirmedTaskIds.has(task._id);
 
     let status = 'pending';
-    if (isRecurring) {
-      if (remindTime.getTime() < now.getTime()) {
-        // nextRemindTime 已过期 → 超时
-        status = 'overdue';
-      } else if (!isConfirmed && task.overduePushCount > 0) {
-        // nextRemindTime 还在未来，但 cron-scan 已标记为超时推送 → 超时
-        status = 'overdue';
-      }
-    } else {
-      // 一次性任务: 只有完成了才算已完成；忽略/延迟/结束都不算
+    // 优先使用 isOverdue 判定超时状态，向后兼容旧数据（nextRemindTime < now 也算超时）
+    if (task.isOverdue || remindTime.getTime() < now.getTime()) status = 'overdue';
+    if (!isRecurring) {
+       // 一次性任务: 只有完成了才算已完成；忽略/延迟/结束都不算
       const confirmAction = confirmByTask[task._id]?.action;
       const isDone = confirmAction === 'completed';
       if (isDone || task.lastCompletedTime) status = 'completed';
-      else if (remindTime.getTime() < now.getTime()) status = 'overdue';
     }
 
     timeline.push(buildItem(task, { status, isRecurring }));
   });
 
-  // 补充今日确认/延迟过但 nextRemindTime 已跨天的任务（被 todayEnd 过滤掉了）
+  // 补充今日确认/延迟过但 nextRemindTime 已跨天的任务，以及今日被临时结束的任务
+  // （这些任务被 todayEnd 或 enabled 过滤掉了，需要单独补回）
   const taskInTimelineIds = new Set(timeline.map(t => t.taskId));
-  const extraTaskIds = Array.from(confirmedTaskIds).filter(id => !taskInTimelineIds.has(id));
-  if (extraTaskIds.length > 0) {
-    const { data: extraTasks } = await db.collection('reminder_tasks')
-      .where({ _id: db.command.in(extraTaskIds) })
-      .get();
-    extraTasks.forEach((task) => {
-      const isRecurring = task.taskMode === 'recurring';
-      const status = task.enabled ? ((isRecurring && !confirmedTaskIds.has(task._id)) ? 'overdue' : 'completed') : 'paused';
-      timeline.push(buildItem(task, { status, isRecurring }));
-    });
+  const supplementIds = new Set(
+    Array.from(confirmedTaskIds).filter(id => !taskInTimelineIds.has(id))
+  );
+  for (const id of pausedTaskIds) {
+    if (!taskInTimelineIds.has(id)) supplementIds.add(id);
   }
-
-  // 补充今日被临时结束的任务（enabled=false 不会在常规查询中返回）
-  if (pausedTaskIds.size > 0) {
-    const { data: pausedTasks } = await db.collection('reminder_tasks')
-      .where({ _id: db.command.in(Array.from(pausedTaskIds)) })
+  if (supplementIds.size > 0) {
+    const { data: supplementTasks } = await db.collection('reminder_tasks')
+      .where({ _id: db.command.in(Array.from(supplementIds)) })
       .get();
-
-    pausedTasks.forEach((task) => {
-      if (!timeline.some((t) => t.taskId === task._id)) {
+    supplementTasks.forEach((task) => {
+      if (pausedTaskIds.has(task._id)) {
         timeline.push(buildItem(task, { status: 'paused' }));
+      } else {
+        const isRecurring = task.taskMode === 'recurring';
+        const status = task.enabled ? ((isRecurring && !confirmedTaskIds.has(task._id)) ? 'overdue' : 'completed') : 'paused';
+        timeline.push(buildItem(task, { status, isRecurring }));
       }
     });
   }

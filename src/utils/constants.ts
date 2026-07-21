@@ -61,7 +61,7 @@ export const TASK_TYPE_CONFIG: Record<
   },
   vitamin: {
     name: "维生素D",
-    icon: "🫧",
+    icon: "🇩",
     uIcon: "medal-fill",
     color: "#1d9e75",
     bgColor: "#E8F7F0",

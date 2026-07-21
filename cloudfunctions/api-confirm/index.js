@@ -39,7 +39,7 @@ exports.main = async (event, context) => {
 async function handleConfirm(userId, familyId, currentUser, data) {
   const { taskId, action, delayMinutes, remark, taskType, taskName } = data;
   const now = nowISO();
-
+  const completedCount = action === 'completed' ? ((task.completedCount || 0) + 1 ): task.completedCount
   // 获取事项
   const { data: task } = await db.collection('reminder_tasks').doc(taskId).get();
   if (!task) return fail('事项不存在');
@@ -64,21 +64,20 @@ async function handleConfirm(userId, familyId, currentUser, data) {
     // 循环事件标识
     taskMode: task.taskMode || 'once',
     // 循环事件：延迟/忽略时也保留当前的 completedCount
-    completedCount: task.taskMode === 'recurring'
-      ? (action === 'completed' ? (task.completedCount || 0) + 1 : (task.completedCount || 0))
-      : null,
+    completedCount,
     createdAt: now,
   };
   const { _id: logId } = await db.collection('confirm_logs').add({ data: log });
 
   // 更新事项状态
   if (action === 'completed') {
-    // 完成: 记录完成者信息，重置重试次数
+    // 完成: 记录完成者信息，重置超时状态
     const updateData = {
       lastCompletedTime: now,
       lastCompletedBy: userId,
       lastCompletedByName: currentUser.nickName,
       lastCompletedByRelation: currentUser.relation || 'other',
+      isOverdue: false,
       processingLock: false,
       lockedAt: null,
     };
@@ -87,7 +86,7 @@ async function handleConfirm(userId, familyId, currentUser, data) {
       const nextRemind = new Date();
       nextRemind.setMinutes(nextRemind.getMinutes() + task.intervalMinutes);
       updateData.nextRemindTime = nextRemind.toISOString();
-      updateData.completedCount = (task.completedCount || 0) + 1;
+      updateData.completedCount = completedCount;
       // 有限循环且已完成全部次数 → 自动停用
       if (task.repeatCount > 0 && updateData.completedCount >= task.repeatCount) {
         updateData.enabled = false;
@@ -107,6 +106,7 @@ async function handleConfirm(userId, familyId, currentUser, data) {
     await db.collection('reminder_tasks').doc(taskId).update({
       data: {
         nextRemindTime: baseTime.toISOString(),
+        isOverdue: false,
         processingLock: false,
         lockedAt: null,
       },
@@ -118,6 +118,7 @@ async function handleConfirm(userId, familyId, currentUser, data) {
     await db.collection('reminder_tasks').doc(taskId).update({
       data: {
         nextRemindTime: nextRemind.toISOString(),
+        isOverdue: false,
         processingLock: false,
         lockedAt: null,
       },

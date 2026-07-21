@@ -36,16 +36,13 @@ function calcNextRemindTime(currentNextRemindTime, intervalMinutes, now) {
 }
 
 /**
- * 构建循环任务的时间推进更新数据
- * @param {object} task 事项对象
- * @param {Date} now 当前时间
- * @param {object} extraData 额外更新字段
+ * 构建推送后的统一更新数据
+ * - 所有任务推送后统一标记 isOverdue=true，等待用户手动操作
+ * - 不推进 nextRemindTime，时间推进由 api-confirm（完成/延迟/忽略）驱动
  * @returns {object} update 的 data 字段
  */
-function buildRepeatTaskUpdate(task, now, extraData = {}) {
-  const data = { ...extraData };
-  data.nextRemindTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now).toISOString();
-  return data;
+function buildOverdueUpdate() {
+  return { isOverdue: true };
 }
 
 // 订阅消息模板ID (需与微信公众平台申请的一致)
@@ -115,23 +112,9 @@ exports.main = async (event, context) => {
       tasks.map(async (task) => {
         processed++;
 
-        // 4z. 一次性任务：已完成 / 已提醒过 → 跳过
-        if (task.taskMode === 'once') {
-          if (task.lastCompletedTime) {
-            console.log(`[cron-scan] 事项 ${task._id} 已完成的一次性任务，跳过`);
-            return;
-          }
-          if (task.hasNotified) {
-            console.log(`[cron-scan] 事项 ${task._id} 一次性任务已提醒，跳过重复通知`);
-            return;
-          }
-        }
-
-        // 4y. 显著超时任务：跳过不推送，等待用户手动确认
-        // 加 1 分钟容差，防止 cron-scan 在提醒时刻之后小幅延迟执行导致误判
-        const remindTimeMs = new Date(task.nextRemindTime).getTime();
-        if (now.getTime() - remindTimeMs > 60 * 1000) {
-          console.log(`[cron-scan] 事项 ${task._id} 已超时，跳过`);
+        // 4z. 已推送过的超时任务：不再重复推送，等待用户手动操作
+        if (task.isOverdue) {
+          console.log(`[cron-scan] 事项 ${task._id} 已超时待处理，跳过`);
           return;
         }
 
@@ -141,42 +124,27 @@ exports.main = async (event, context) => {
         ) {
           console.log(`[cron-scan] 事项 ${task._id} 不在提醒窗口内`);
           windowSkipped++;
-
+          // skip_and_continue: 基于排定时间递推，防止漂移
+          let nextStart = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now);
           // 根据策略处理
           if (task.windowSkipStrategy === "delay_to_next_window") {
-            const nextStart = getNextWindowStart(task.reminderWindowStart);
-            await db
-              .collection("reminder_tasks")
-              .doc(task._id)
-              .update({
-                data: { nextRemindTime: nextStart.toISOString() },
-              });
-          } else {
-            // skip_and_continue: 基于排定时间递推，防止漂移
-            const nextTime = calcNextRemindTime(task.nextRemindTime, task.intervalMinutes, now);
-            await db
-              .collection("reminder_tasks")
-              .doc(task._id)
-              .update({
-                data: { nextRemindTime: nextTime.toISOString() },
-              });
+            nextStart = getNextWindowStart(task.reminderWindowStart);
           }
+          await db
+            .collection("reminder_tasks")
+            .doc(task._id)
+            .update({
+              data: { nextRemindTime: nextStart.toISOString() },
+            });
           return;
         }
 
         // 4b. P2 优先级事项 — 仅红点通知，不消耗配额
         if (task.priority === "p2") {
           console.log(`[cron-scan] 事项 ${task._id} 为P2优先级，仅红点通知`);
-          if (task.taskMode === 'once') {
-            // 一次性任务不推进，标记已提醒
-            await db.collection("reminder_tasks").doc(task._id).update({
-              data: { hasNotified: true },
-            });
-          } else {
-            await db.collection("reminder_tasks").doc(task._id).update({
-              data: buildRepeatTaskUpdate(task, now),
-            });
-          }
+          await db.collection("reminder_tasks").doc(task._id).update({
+            data: buildOverdueUpdate(),
+          });
           await logNotification(task, null, "success", null, 0, "red_dot_only");
           return;
         }
@@ -187,18 +155,7 @@ exports.main = async (event, context) => {
           console.log(`[cron-scan] 事项 ${task._id} 家庭配额不足`);
           quotaExhausted++;
           await logNotification(task, null, "quota_exhausted", null, 0);
-
-          if (task.taskMode === 'once') {
-            // 一次性任务配额不足，标记已提醒，不无限重试
-            await db.collection("reminder_tasks").doc(task._id).update({
-              data: { hasNotified: true },
-            });
-          } else {
-            const nextTime = new Date(now.getTime() + 30 * 60 * 1000);
-            await db.collection("reminder_tasks").doc(task._id).update({
-              data: { nextRemindTime: nextTime.toISOString() },
-            });
-          }
+          // 不修改任务状态，让其自然进入超时，用户在时间线中仍能看到
           return;
         }
         // 4e. 向有配额的家庭成员发送订阅消息
@@ -221,17 +178,10 @@ exports.main = async (event, context) => {
           }
         }
 
-        // 4f. 更新事项
-        if (task.taskMode === 'once') {
-          // 一次性任务只提醒一次，不推进 nextRemindTime
-          await db.collection("reminder_tasks").doc(task._id).update({
-            data: { hasNotified: true },
-          });
-        } else {
-          await db.collection("reminder_tasks").doc(task._id).update({
-            data: buildRepeatTaskUpdate(task, now),
-          });
-        }
+        // 4f. 更新事项：推送后统一标记超时状态，防止重复推送
+        await db.collection("reminder_tasks").doc(task._id).update({
+          data: buildOverdueUpdate(),
+        });
       }),
     );
 
