@@ -20,7 +20,7 @@
       <view class="info-footer">
         <view class="next-remind-wrap">
           <view class="next-dot" :class="{ active: task.enabled }" />
-          <text class="next-remind" :class="{ paused: !task.enabled }">{{ nextRemindText }}</text>
+          <text class="next-remind" :class="{ stopped: !task.enabled }">{{ nextRemindText }}</text>
         </view>
       </view>
     </view>
@@ -154,7 +154,7 @@ const nextRemindText = computed(() => {
           color: #ff7b7b;
           font-weight: 500;
 
-          &.paused {
+          &.stopped {
             color: #bbb;
           }
         }

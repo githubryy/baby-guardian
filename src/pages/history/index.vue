@@ -198,7 +198,7 @@ function actionText(action: ConfirmAction): string {
     completed: '已完成',
     delayed: '已延迟',
     ignored: '已忽略',
-    paused: '已结束',
+    stopped: '已停止',
   };
   return map[action] || action;
 }

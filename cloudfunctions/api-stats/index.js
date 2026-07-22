@@ -31,7 +31,7 @@ function toDateStr(d) {
 
 /** 创建空的日统计对象 */
 function emptyDayStat(dateStr) {
-  return { date: dateStr, totalReminders: 0, completedCount: 0, delayedCount: 0, ignoredCount: 0, pausedCount: 0, criticallyOverdueCount: 0, completionRate: 0 };
+  return { date: dateStr, totalReminders: 0, completedCount: 0, delayedCount: 0, ignoredCount: 0, stoppedCount: 0, criticallyOverdueCount: 0, completionRate: 0 };
 }
 
 /** 计算完成率 */
@@ -96,38 +96,6 @@ async function handleSummary(userId, familyId, babyId) {
     .get();
   const todayReminders = todayTasks.length;
 
-  // 今日已完成
-  const { data: todayLogs } = await db.collection('confirm_logs')
-    .where({ familyId, action: 'completed', completedTime: _.gte(today.start.toISOString()) })
-    .get();
-  const todayCompleted = todayLogs.length;
-  const todayCompletionRate = calcRate(todayCompleted, todayReminders);
-
-  // 显著超时（一次查询同时得到 total 和 today）
-  const { data: criticalTasks } = await db.collection('reminder_tasks')
-    .where({ ...taskQuery, isOverdueCritically: true })
-    .get();
-  const totalCriticallyOverdue = criticalTasks.length;
-  const todayCriticallyOverdue = criticalTasks.filter(
-    (t) => t.overdueTimeoutAt >= today.start.toISOString()
-  ).length;
-
-  // 暂停事件（一次查询同时得到 total 和 today）
-  const { data: pausedLogs } = await db.collection('confirm_logs')
-    .where({ familyId, action: 'paused' })
-    .get();
-  const totalPaused = pausedLogs.length;
-  const todayPaused = pausedLogs.filter(
-    (l) => l.completedTime >= today.start.toISOString()
-  ).length;
-
-  // 总完成事件
-  const { total: totalCompleted } = await db.collection('confirm_logs')
-    .where({ familyId, action: 'completed' })
-    .count();
-
-  const totalEvents = totalCompleted + totalPaused + totalCriticallyOverdue;
-
   // 最近 7 天日期
   const dates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
@@ -137,7 +105,7 @@ async function handleSummary(userId, familyId, babyId) {
   const weekStart = dayBoundaries(dates[0]).start;
   const weekEnd = dayBoundaries(dates[6]).end;
 
-  // 一次查询整周 confirm_logs
+  // 一次查询整周 confirm_logs（同时提供今日完成/停止 + 周统计）
   const { data: weekLogs } = await db.collection('confirm_logs')
     .where({
       familyId,
@@ -145,16 +113,37 @@ async function handleSummary(userId, familyId, babyId) {
     })
     .get();
 
-  // 一次查询整周显著超时
-  const { data: weekCriticalTasks } = await db.collection('reminder_tasks')
-    .where({
-      ...taskQuery,
-      isOverdueCritically: true,
-      overdueTimeoutAt: _.gte(weekStart.toISOString()).and(_.lte(weekEnd.toISOString())),
-    })
-    .get();
+  // 从 weekLogs 中提取今日数据，避免重复查询
+  const todayCompleted = weekLogs.filter(
+    (l) => l.action === 'completed' && l.completedTime >= today.start.toISOString()
+  ).length;
+  const todayCompletionRate = calcRate(todayCompleted, todayReminders);
 
-  // 按日期分组
+  // 一次查询所有显著超时（替代原来的 total + weekly 两次查询）
+  const { data: criticalTasks } = await db.collection('reminder_tasks')
+    .where({ ...taskQuery, isOverdueCritically: true })
+    .get();
+  const totalCriticallyOverdue = criticalTasks.length;
+  const todayCriticallyOverdue = criticalTasks.filter(
+    (t) => t.overdueTimeoutAt >= today.start.toISOString()
+  ).length;
+
+  // 停止事件：total 用 count 替代 get，today 从 weekLogs 提取
+  const { total: totalStopped } = await db.collection('confirm_logs')
+    .where({ familyId, action: 'stopped' })
+    .count();
+  const todayStopped = weekLogs.filter(
+    (l) => l.action === 'stopped' && l.completedTime >= today.start.toISOString()
+  ).length;
+
+  // 总完成事件
+  const { total: totalCompleted } = await db.collection('confirm_logs')
+    .where({ familyId, action: 'completed' })
+    .count();
+
+  const totalEvents = totalCompleted + totalStopped + totalCriticallyOverdue;
+
+  // 按日期分组 weekLogs
   const weekMap = {};
   dates.forEach((d) => { weekMap[toDateStr(d)] = emptyDayStat(toDateStr(d)); });
 
@@ -165,13 +154,16 @@ async function handleSummary(userId, familyId, babyId) {
       if (l.action === 'completed') weekMap[dateKey].completedCount++;
       else if (l.action === 'delayed') weekMap[dateKey].delayedCount++;
       else if (l.action === 'ignored') weekMap[dateKey].ignoredCount++;
-      else if (l.action === 'paused') weekMap[dateKey].pausedCount++;
+      else if (l.action === 'stopped') weekMap[dateKey].stoppedCount++;
     }
   });
 
-  weekCriticalTasks.forEach((t) => {
-    const dateKey = toDateStr(new Date(t.overdueTimeoutAt));
-    if (weekMap[dateKey]) weekMap[dateKey].criticallyOverdueCount++;
+  // 从 criticalTasks 中内存过滤本周显著超时（不再单独查询）
+  criticalTasks.forEach((t) => {
+    if (t.overdueTimeoutAt >= weekStart.toISOString() && t.overdueTimeoutAt <= weekEnd.toISOString()) {
+      const dateKey = toDateStr(new Date(t.overdueTimeoutAt));
+      if (weekMap[dateKey]) weekMap[dateKey].criticallyOverdueCount++;
+    }
   });
 
   const weeklyStats = Object.values(weekMap).map((day) => ({
@@ -186,7 +178,7 @@ async function handleSummary(userId, familyId, babyId) {
     totalBabies, totalTasks, activeTasks,
     todayReminders, todayCompleted, todayCompletionRate,
     todayCriticallyOverdue, totalCriticallyOverdue,
-    todayPaused, totalPaused,
+    todayStopped, totalStopped,
     totalCompleted, totalEvents,
     weeklyStats, typeStats,
   });
@@ -225,7 +217,7 @@ async function handleDaily(userId, familyId, params) {
     if (l.action === 'completed') day.completedCount++;
     else if (l.action === 'delayed') day.delayedCount++;
     else if (l.action === 'ignored') day.ignoredCount++;
-    else if (l.action === 'paused') day.pausedCount++;
+    else if (l.action === 'stopped') day.stoppedCount++;
   });
 
   criticallyOverdueTasks.forEach((t) => {

@@ -72,13 +72,15 @@ async function handleConfirm(userId, familyId, currentUser, data) {
 
   // 更新事项状态
   if (action === 'completed') {
-    // 完成: 记录完成者信息，重置超时状态
+    // 完成: 记录完成者信息，重置超时状态，清除显著超时标识
     const updateData = {
       lastCompletedTime: now,
       lastCompletedBy: userId,
       lastCompletedByName: currentUser.nickName,
       lastCompletedByRelation: currentUser.relation || 'other',
       isOverdue: false,
+      isOverdueCritically: false,
+      overdueDetectedAt: null,
       processingLock: false,
       lockedAt: null,
       completedCount
@@ -108,27 +110,33 @@ async function handleConfirm(userId, familyId, currentUser, data) {
       data: {
         nextRemindTime: baseTime.toISOString(),
         isOverdue: false,
+        isOverdueCritically: false,
+        overdueDetectedAt: null,
         processingLock: false,
         lockedAt: null,
       },
     });
   } else if (action === 'ignored') {
-    // 忽略: 跳过本次，计算下次
+    // 忽略: 跳过本次，计算下次，清除显著超时标识
     const nextRemind = new Date();
     nextRemind.setMinutes(nextRemind.getMinutes() + task.intervalMinutes);
     await db.collection('reminder_tasks').doc(taskId).update({
       data: {
         nextRemindTime: nextRemind.toISOString(),
         isOverdue: false,
+        isOverdueCritically: false,
+        overdueDetectedAt: null,
         processingLock: false,
         lockedAt: null,
       },
     });
-  } else if (action === 'paused') {
-    // 临时结束: 永久停用该事项，不可恢复，只能重新发起
+  } else if (action === 'stopped') {
+    // 停止: 永久停用该事项，不可恢复，只能重新发起，清除显著超时标识
     await db.collection('reminder_tasks').doc(taskId).update({
       data: {
         enabled: false,
+        isOverdueCritically: false,
+        overdueDetectedAt: null,
         processingLock: false,
         lockedAt: null,
       },

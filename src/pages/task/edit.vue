@@ -236,7 +236,7 @@ const activeTaskTypes = computed(() => {
   const babyId = babyStore.currentBabyId;
   return new Set(
     taskStore.timeline
-      .filter((t) => t.babyId === babyId && t.status !== 'completed' && t.status !== 'paused')
+      .filter((t) => t.babyId === babyId && t.status !== 'completed' && t.status !== 'stopped')
       .map((t) => t.type)
   );
 });

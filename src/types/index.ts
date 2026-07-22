@@ -126,7 +126,7 @@ export interface ReminderTask {
 // ==================== 确认记录 ====================
 
 /** 确认操作类型 */
-export type ConfirmAction = 'completed' | 'delayed' | 'ignored' | 'paused';
+export type ConfirmAction = 'completed' | 'delayed' | 'ignored' | 'stopped';
 
 /** 确认日志表 */
 export interface ConfirmLog {
@@ -276,7 +276,7 @@ export interface DailyStat {
   completedCount: number;
   delayedCount: number;
   ignoredCount: number;
-  pausedCount: number;
+  stoppedCount: number;
   criticallyOverdueCount: number;
   /** 完成率 */
   completionRate: number;
@@ -301,9 +301,9 @@ export interface StatsSummary {
   /** 显著超时事件数 */
   todayCriticallyOverdue: number;
   totalCriticallyOverdue: number;
-  /** 暂停事件数 */
-  todayPaused: number;
-  totalPaused: number;
+  /** 停止事件数 */
+  todayStopped: number;
+  totalStopped: number;
   /** 已完成事件总数 */
   totalCompleted: number;
   /** 总事件数（已完成+暂停+显著超时） */
@@ -327,8 +327,8 @@ export interface TimelineItem {
   typeColor: string;
   /** 距上次时长描述 */
   lastDurationText?: string;
-  /** 状态: pending=待处理, completed=已完成, delayed=已延迟, overdue=已超时, paused=已结束(永久,不可恢复) */
-  status: 'pending' | 'completed' | 'delayed' | 'overdue' | 'paused';
+  /** 状态: pending=待处理, completed=已完成, delayed=已延迟, overdue=已超时, stopped=已停止(永久,不可恢复) */
+  status: 'pending' | 'completed' | 'delayed' | 'overdue' | 'stopped';
   priority: TaskPriority;
   /** 完成者信息 */
   completedByName?: string;

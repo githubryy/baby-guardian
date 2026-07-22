@@ -7,7 +7,6 @@ import type { ReminderTask, TimelineItem, TaskType, TaskPriority, WindowSkipStra
 import * as taskApi from '@/api/task';
 import * as confirmApi from '@/api/confirm';
 import { showLoading, hideLoading, showSuccess } from '@/utils/request';
-import { TASK_TYPE_CONFIG } from '@/utils/constants';
 
 export const useTaskStore = defineStore('task', () => {
   // ===== State =====
@@ -20,7 +19,7 @@ export const useTaskStore = defineStore('task', () => {
   const pendingItems = computed(() => timeline.value.filter((t) => t.status === 'pending'));
   const completedItems = computed(() => timeline.value.filter((t) => t.status === 'completed'));
   const overdueItems = computed(() => timeline.value.filter((t) => t.status === 'overdue'));
-  const pausedItems = computed(() => timeline.value.filter((t) => t.status === 'paused'));
+  const stoppedItems = computed(() => timeline.value.filter((t) => t.status === 'stopped'));
 
   // ===== Actions =====
 
@@ -131,7 +130,7 @@ export const useTaskStore = defineStore('task', () => {
   /** 确认事项 */
   async function confirmTask(data: {
     taskId: string;
-    action: 'completed' | 'delayed' | 'ignored' | 'paused';
+    action: 'completed' | 'delayed' | 'ignored' | 'stopped';
     delayMinutes?: number;
     remark?: string;
     taskType: TaskType;
@@ -172,14 +171,14 @@ export const useTaskStore = defineStore('task', () => {
         } else if (data.action === 'ignored') {
           // 忽略：本次跳过，状态不变（nextRemindTime 由云函数更新）
           // loadData 重新加载后将显示正确的状态
-        } else if (data.action === 'paused') {
-          item.status = 'paused';
+        } else if (data.action === 'stopped') {
+          item.status = 'stopped';
           // 同时在 taskList 中禁用该任务，使其不可恢复
           const task = taskList.value.find((t) => t._id === data.taskId);
           if (task) task.enabled = false;
         }
       }
-      showSuccess(data.action === 'completed' ? '已完成' : data.action === 'delayed' ? '已延迟' : data.action === 'paused' ? '已结束' : '已忽略');
+      showSuccess(data.action === 'completed' ? '已完成' : data.action === 'delayed' ? '已延迟' : data.action === 'stopped' ? '已停止' : '已忽略');
       return true;
     } catch (err) {
       console.error('[确认事项失败]', err);
@@ -195,7 +194,7 @@ export const useTaskStore = defineStore('task', () => {
     pendingItems,
     completedItems,
     overdueItems,
-    pausedItems,
+    stoppedItems,
     loadTaskList,
     loadTimeline,
     addTask,

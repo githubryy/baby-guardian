@@ -146,12 +146,13 @@ exports.main = async (event, context) => {
               0,
               "system",
             );
-            // 停止计时并记录显著超时标识
+            // 停止计时并记录显著超时标识，递增显著超时次数
             await db.collection("reminder_tasks").doc(task._id).update({
               data: {
                 overdueDetectedAt: null,
                 isOverdueCritically: true,
                 overdueTimeoutAt: now.toISOString(),
+                overdueCriticallyCount: _.inc(1),
               },
             });
             return;

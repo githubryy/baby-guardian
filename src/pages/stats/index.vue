@@ -27,15 +27,15 @@
             <text class="ec-label">显著超时事件</text>
           </view>
         </view>
-        <!-- 暂停事件 -->
-        <view class="event-card paused">
+        <!-- 停止事件 -->
+        <view class="event-card stopped">
           <view class="ec-icon-box" style="background: linear-gradient(135deg, #f5b547, #ef9f27)">
             <u-icon name="pause-circle-fill" :size="28" color="#fff" />
           </view>
           <view class="ec-body">
-            <text class="ec-num paused">{{ summary.todayPaused }}</text>
-            <text class="ec-total">总计 {{ summary.totalPaused }}</text>
-            <text class="ec-label">暂停事件</text>
+            <text class="ec-num stopped">{{ summary.todayStopped }}</text>
+            <text class="ec-total">总计 {{ summary.totalStopped }}</text>
+            <text class="ec-label">停止事件</text>
           </view>
         </view>
         <!-- 已完成事件 -->
@@ -77,7 +77,7 @@
           <view class="bar-track">
             <view class="bar-stack-wrap">
               <view class="bar-fill-comp" :style="{ height: getStackHeight(stat.completedCount, stat) + '%', background: 'linear-gradient(180deg, #28b886, #1d9e75)', animationDelay: index * 0.05 + 's' }" />
-              <view class="bar-fill-comp" :style="{ height: getStackHeight(stat.pausedCount || 0, stat) + '%', background: 'linear-gradient(180deg, #f5b547, #ef9f27)', animationDelay: (index * 0.05 + 0.1) + 's' }" />
+              <view class="bar-fill-comp" :style="{ height: getStackHeight(stat.stoppedCount || 0, stat) + '%', background: 'linear-gradient(180deg, #f5b547, #ef9f27)', animationDelay: (index * 0.05 + 0.1) + 's' }" />
               <view class="bar-fill-comp" :style="{ height: getStackHeight(stat.criticallyOverdueCount || 0, stat) + '%', background: 'linear-gradient(180deg, #ee6a69, #e24b4a)', animationDelay: (index * 0.05 + 0.2) + 's' }" />
             </view>
           </view>
@@ -166,8 +166,8 @@ const summary = ref<StatsSummary>({
   todayCompletionRate: 0,
   todayCriticallyOverdue: 0,
   totalCriticallyOverdue: 0,
-  todayPaused: 0,
-  totalPaused: 0,
+  todayStopped: 0,
+  totalStopped: 0,
   totalCompleted: 0,
   totalEvents: 0,
   weeklyStats: [],
@@ -184,7 +184,7 @@ const periodLabel = computed(() => activePeriod.value === 'week' ? '本周' : '�
 const chartData = computed(() => {
   return summary.value.weeklyStats.length > 0
     ? summary.value.weeklyStats
-    : getRecentDates(7).map(date => ({ date, totalReminders: 0, completedCount: 0, delayedCount: 0, ignoredCount: 0, pausedCount: 0, criticallyOverdueCount: 0, completionRate: 0 }));
+    : getRecentDates(7).map(date => ({ date, totalReminders: 0, completedCount: 0, delayedCount: 0, ignoredCount: 0, stoppedCount: 0, criticallyOverdueCount: 0, completionRate: 0 }));
 });
 
 onMounted(() => {
@@ -214,7 +214,7 @@ async function loadData() {
 
 function getMaxForDay(stat: Record<string, any>): number {
   const comp = Number(stat.completedCount) || 0;
-  const pause = Number(stat.pausedCount) || 0;
+  const pause = Number(stat.stoppedCount) || 0;
   const crit = Number(stat.criticallyOverdueCount) || 0;
   return Math.max(comp + pause + crit, 1);
 }
@@ -225,7 +225,7 @@ function getStackHeight(count: number, stat: Record<string, any>): number {
 }
 
 function totalForDay(stat: Record<string, any>): number {
-  return (Number(stat.completedCount) || 0) + (Number(stat.pausedCount) || 0) + (Number(stat.criticallyOverdueCount) || 0);
+  return (Number(stat.completedCount) || 0) + (Number(stat.stoppedCount) || 0) + (Number(stat.criticallyOverdueCount) || 0);
 }
 
 function getTaskUIcon(type: TaskType): string {
@@ -336,7 +336,7 @@ function getTaskColor(type: TaskType | string): string {
           line-height: 1.1;
 
           &.critical { color: #e24b4a; }
-          &.paused { color: #ef9f27; }
+          &.stopped { color: #ef9f27; }
           &.completed { color: #1d9e75; }
           &.total { color: #5b7fff; }
         }
