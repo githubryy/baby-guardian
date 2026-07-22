@@ -185,15 +185,15 @@ async function handleTimeline(userId, familyId, babyId) {
 
   // 构建操作人映射（用于显示谁完成了事项）
   const confirmByTask = {};
-  const stoppedTaskIds = new Set();
+  const endedTaskIds = new Set();
   const pausedTaskIds = new Set();
   confirmLogs.forEach((log) => {
     if (!confirmByTask[log.taskId]) {
       confirmByTask[log.taskId] = log;
     }
-    // 收集今日被停止的任务
-    if (log.action === 'stopped') {
-      stoppedTaskIds.add(log.taskId);
+    // 收集今日被结束的任务
+    if (log.action === 'ended') {
+      endedTaskIds.add(log.taskId);
     }
     // 收集今日被暂停的任务
     if (log.action === 'paused') {
@@ -223,7 +223,7 @@ async function handleTimeline(userId, familyId, babyId) {
     const config = TASK_TYPE_CONFIG[task.type] || TASK_TYPE_CONFIG.custom;
     const baby = babyMap[task.babyId];
     const confirmLog = confirmByTask[task._id];
-    const assignee = status !== 'stopped' && task.assigneeId ? memberMap[task.assigneeId] : null;
+    const assignee = status !== 'ended' && task.assigneeId ? memberMap[task.assigneeId] : null;
 
     return {
       taskId: task._id,
@@ -276,13 +276,13 @@ async function handleTimeline(userId, familyId, babyId) {
     timeline.push(buildItem(task, { status, isRecurring }));
   });
 
-  // 补充今日确认/延迟过但 nextRemindTime 已跨天的任务，以及今日被停止的任务
+  // 补充今日确认/延迟过但 nextRemindTime 已跨天的任务，以及今日被结束的任务
   // （这些任务被 todayEnd 或 endedAt 过滤掉了，需要单独补回）
   const taskInTimelineIds = new Set(timeline.map(t => t.taskId));
   const supplementIds = new Set(
     Array.from(confirmedTaskIds).filter(id => !taskInTimelineIds.has(id))
   );
-  for (const id of stoppedTaskIds) {
+  for (const id of endedTaskIds) {
     if (!taskInTimelineIds.has(id)) supplementIds.add(id);
   }
   for (const id of pausedTaskIds) {
@@ -293,8 +293,8 @@ async function handleTimeline(userId, familyId, babyId) {
       .where({ _id: db.command.in(Array.from(supplementIds)) })
       .get();
     supplementTasks.forEach((task) => {
-      if (stoppedTaskIds.has(task._id)) {
-        timeline.push(buildItem(task, { status: 'stopped' }));
+      if (endedTaskIds.has(task._id)) {
+        timeline.push(buildItem(task, { status: 'ended' }));
       } else if (pausedTaskIds.has(task._id)) {
         timeline.push(buildItem(task, { status: 'paused', isRecurring: task.taskMode === 'recurring' }));
       } else {

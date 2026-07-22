@@ -144,16 +144,16 @@
           </view>
 
           <!-- 已结束事项 -->
-          <view v-if="stoppedItems.length > 0" class="section">
+          <view v-if="endedItems.length > 0" class="section">
             <view class="section-header">
               <view class="section-title-wrap">
-                <view class="section-dot stopped-dot" />
+                <view class="section-dot ended-dot" />
                 <text class="section-title">已结束</text>
               </view>
-              <u-tag :text="String(stoppedItems.length)" type="primary" size="mini" shape="circle" plain />
+              <u-tag :text="String(endedItems.length)" type="primary" size="mini" shape="circle" plain />
             </view>
             <view class="section-list fade-in">
-              <TimelineItemComp v-for="item in stoppedItems" :key="item.taskId" :item="item"
+              <TimelineItemComp v-for="item in endedItems" :key="item.taskId" :item="item"
                 @item-tap="goTaskDetail" />
             </view>
           </view>
@@ -192,7 +192,7 @@ const babyStore = useBabyStore();
 const taskStore = useTaskStore();
 const userStore = useUserStore();
 const { currentBaby, hasBaby, currentBabyAge } = storeToRefs(babyStore);
-const { timeline, pendingItems, completedItems, overdueItems, stoppedItems, pausedItems } = storeToRefs(taskStore);
+const { timeline, pendingItems, completedItems, overdueItems, endedItems, pausedItems } = storeToRefs(taskStore);
 
 const statusBarHeight = ref(44);
 const refreshing = ref(false);
@@ -467,7 +467,7 @@ async function handleStop(item: TimelineItem) {
   try {
     await taskStore.confirmTask({
       taskId: item.taskId,
-      action: 'stopped',
+      action: 'ended',
       taskType: item.type,
       taskName: item.typeName,
       taskMode: item.taskMode,
@@ -731,7 +731,7 @@ async function handleStop(item: TimelineItem) {
           box-shadow: 0 0 0 4rpx rgba(29, 158, 117, 0.15);
         }
 
-        &.stopped-dot {
+        &.ended-dot {
           background: #7f77dd;
           box-shadow: 0 0 0 4rpx rgba(127, 119, 221, 0.15);
         }

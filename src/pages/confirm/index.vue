@@ -418,7 +418,7 @@ async function onPause() {
         try {
           const ok = await taskStore.confirmTask({
             taskId: taskId.value,
-            action: 'stopped',
+            action: 'ended',
             taskType: task.value?.type,
             taskName: getTaskName(),
             taskMode: task.value?.taskMode,

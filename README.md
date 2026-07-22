@@ -410,7 +410,7 @@ v2.0 通过 `familyId` 贯穿所有数据查询：
 | `babyId` | string | 关联宝宝 ID |
 | `userId` | string | 关联用户 ID |
 | `familyId` | string | 家庭 ID（v2.0） |
-| `action` | string | `"completed"` / `"delayed"` / `"stopped"` / `"paused"` / `"restart"` |
+| `action` | string | `"completed"` / `"delayed"` / `"ended"` / `"paused"` / `"restart"` |
 | `completedTime` | string | 实际完成时间 |
 | `delayMinutes` | number | 延迟分钟数（action=delayed 时） |
 | `remark` | string | 备注（可选） |

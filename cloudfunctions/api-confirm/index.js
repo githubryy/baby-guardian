@@ -117,8 +117,8 @@ async function handleConfirm(userId, familyId, currentUser, data) {
         lockedAt: null,
       },
     });
-  } else if (action === 'stopped') {
-    // 停止: 结束该事项，不可恢复，只能重新发起，清除显著超时标识
+  } else if (action === 'ended') {
+    // 结束该事项，不可恢复，只能重新发起，清除显著超时标识
     await db.collection('reminder_tasks').doc(taskId).update({
       data: {
         endedAt: now,

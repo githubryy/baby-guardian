@@ -197,7 +197,7 @@ function actionText(action: ConfirmAction): string {
   const map: Record<ConfirmAction, string> = {
     completed: '已完成',
     delayed: '已延迟',
-    stopped: '已结束',
+    ended: '已结束',
     paused: '已暂停',
     restart: '待重启'
   };
@@ -444,7 +444,7 @@ function resetFilter() {
 
         &.completed { background: #1d9e75; }
         &.delayed { background: #ef9f27; }
-        &.stopped { background: #aaa; }
+        &.ended { background: #aaa; }
         &.paused { background: #5b8def; }
         &.restart { background: #17a2b8; }
       }
@@ -454,7 +454,7 @@ function resetFilter() {
 
         &.completed { color: #1d9e75; }
         &.delayed { color: #ef9f27; }
-        &.stopped { color: #aaa; }
+        &.ended { color: #aaa; }
         &.paused { color: #5b8def; }
         &.restart { color: #17a2b8; }
       }

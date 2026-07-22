@@ -19,7 +19,7 @@ export const useTaskStore = defineStore('task', () => {
   const pendingItems = computed(() => timeline.value.filter((t) => t.status === 'pending'));
   const completedItems = computed(() => timeline.value.filter((t) => t.status === 'completed'));
   const overdueItems = computed(() => timeline.value.filter((t) => t.status === 'overdue'));
-  const stoppedItems = computed(() => timeline.value.filter((t) => t.status === 'stopped'));
+  const endedItems = computed(() => timeline.value.filter((t) => t.status === 'ended'));
   const pausedItems = computed(() => timeline.value.filter((t) => t.status === 'paused'));
 
   // ===== Actions =====
@@ -131,7 +131,7 @@ export const useTaskStore = defineStore('task', () => {
   /** 确认事项 */
   async function confirmTask(data: {
     taskId: string;
-    action: 'completed' | 'delayed' | 'stopped' | 'paused' | 'restart';
+    action: 'completed' | 'delayed' | 'ended' | 'paused' | 'restart';
     delayMinutes?: number;
     remark?: string;
     taskType: TaskType;
@@ -169,8 +169,8 @@ export const useTaskStore = defineStore('task', () => {
           }
         } else if (data.action === 'delayed') {
           item.status = 'delayed';
-        } else if (data.action === 'stopped') {
-          item.status = 'stopped';
+        } else if (data.action === 'ended') {
+          item.status = 'ended';
           // 同时在 taskList 中结束该任务，使其不可恢复
           const task = taskList.value.find((t) => t._id === data.taskId);
           if (task) task.endedAt = new Date().toISOString();
@@ -184,7 +184,7 @@ export const useTaskStore = defineStore('task', () => {
       showSuccess(
         data.action === 'completed' ? '已完成' :
         data.action === 'delayed' ? '已延迟' :
-        data.action === 'stopped' ? '已停止' :
+        data.action === 'ended' ? '已结束' :
         data.action === 'paused' ? '已暂停' :
         data.action === 'restart' ? '已重启' : ''
       );
@@ -203,7 +203,7 @@ export const useTaskStore = defineStore('task', () => {
     pendingItems,
     completedItems,
     overdueItems,
-    stoppedItems,
+    endedItems,
     pausedItems,
     loadTaskList,
     loadTimeline,

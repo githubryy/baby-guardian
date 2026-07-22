@@ -184,7 +184,7 @@ const dotColor = computed(() => {
   if (props.item.status === 'overdue') return '#e24b4a';
   if (props.item.status === 'completed') return '#1d9e75';
   if (props.item.status === 'delayed') return '#ef9f27';
-  if (props.item.status === 'stopped') return '#7f77dd';
+  if (props.item.status === 'ended') return '#7f77dd';
   if (props.item.status === 'paused') return '#5b8def';
   return safeTypeColor.value;
 });
@@ -533,7 +533,7 @@ function getRelationBg(relation?: FamilyRelation) {
     }
   }
 
-  &.stopped {
+  &.ended {
     .content-card {
       border-left: 6rpx solid #7f77dd;
       opacity: 0.7;

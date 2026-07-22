@@ -31,7 +31,7 @@ function toDateStr(d) {
 
 /** 创建空的日统计对象 */
 function emptyDayStat(dateStr) {
-  return { date: dateStr, totalReminders: 0, completedCount: 0, delayedCount: 0, stoppedCount: 0, criticallyOverdueCount: 0, completionRate: 0 };
+  return { date: dateStr, totalReminders: 0, completedCount: 0, delayedCount: 0, endedCount: 0, criticallyOverdueCount: 0, completionRate: 0 };
 }
 
 /** 计算完成率 */
@@ -135,12 +135,12 @@ async function handleSummary(userId, familyId, babyId) {
     .filter((t) => t.overdueTimeoutAt >= today.start.toISOString())
     .reduce((sum, t) => sum + (t.overdueCriticallyCount || 0), 0);
 
-  // 停止事件：total 用 count 替代 get，today 从 weekLogs 提取
-  const { total: totalStopped } = await db.collection('confirm_logs')
-    .where({ familyId, action: 'stopped' })
+  // 结束事件：total 用 count 替代 get，today 从 weekLogs 提取
+  const { total: totalEnded } = await db.collection('confirm_logs')
+    .where({ familyId, action: 'ended' })
     .count();
-  const todayStopped = weekLogs.filter(
-    (l) => l.action === 'stopped' && l.completedTime >= today.start.toISOString()
+  const todayEnded = weekLogs.filter(
+    (l) => l.action === 'ended' && l.completedTime >= today.start.toISOString()
   ).length;
 
   // 总完成事件
@@ -161,7 +161,7 @@ async function handleSummary(userId, familyId, babyId) {
       weekMap[dateKey].totalReminders++;
       if (l.action === 'completed') weekMap[dateKey].completedCount++;
       else if (l.action === 'delayed') weekMap[dateKey].delayedCount++;
-      else if (l.action === 'stopped') weekMap[dateKey].stoppedCount++;
+      else if (l.action === 'ended') weekMap[dateKey].endedCount++;
     }
   });
 
@@ -185,7 +185,7 @@ async function handleSummary(userId, familyId, babyId) {
     totalBabies, totalTasks, activeTasks,
     todayReminders, todayCompleted, todayCompletionRate,
     todayCriticallyOverdue, totalCriticallyOverdue,
-    todayStopped, totalStopped,
+    todayEnded, totalEnded,
     totalCompleted, totalEvents,
     weeklyStats, typeStats,
   });
@@ -222,7 +222,7 @@ async function handleDaily(userId, familyId, params) {
     day.totalReminders++;
     if (l.action === 'completed') day.completedCount++;
     else if (l.action === 'delayed') day.delayedCount++;
-    else if (l.action === 'stopped') day.stoppedCount++;
+    else if (l.action === 'ended') day.endedCount++;
   });
 
   criticallyOverdueTasks.forEach((t) => {
