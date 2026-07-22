@@ -81,7 +81,7 @@ exports.main = async (event, context) => {
     const { data: tasks } = await db
       .collection("reminder_tasks")
       .where({
-        enabled: true,
+        endedAt: _.exists(false),
         nextRemindTime: _.lte(now.toISOString()),
         processingLock: false,
         isPaused: _.neq(true), // 暂停的任务不处理

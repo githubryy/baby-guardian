@@ -1,5 +1,5 @@
 <template>
-  <view class="task-item tap-shrink" :class="{ disabled: !task.enabled }" @tap="$emit('itemTap', task)">
+  <view class="task-item tap-shrink" :class="{ disabled: task.endedAt }" @tap="$emit('itemTap', task)">
     <view class="type-icon" :style="{ background: typeConfig.bgColor }">
       <u-icon :name="typeConfig.icon" :size="30" :color="typeConfig.color" />
     </view>
@@ -19,8 +19,8 @@
       </view>
       <view class="info-footer">
         <view class="next-remind-wrap">
-          <view class="next-dot" :class="{ active: task.enabled }" />
-          <text class="next-remind" :class="{ stopped: !task.enabled }">{{ nextRemindText }}</text>
+          <view class="next-dot" :class="{ active: !task.endedAt }" />
+          <text class="next-remind" :class="{ stopped: task.endedAt }">{{ nextRemindText }}</text>
         </view>
       </view>
     </view>
@@ -56,13 +56,13 @@ const priorityTagType = computed<'error' | 'warning' | 'primary'>(() => {
 });
 
 const enabledProxy = computed({
-  get: () => props.task.enabled,
+  get: () => !props.task.endedAt,
   set: (val: boolean) => emit('toggle', props.task, val),
 });
 
 const intervalText = computed(() => durationText(props.task.intervalMinutes));
 const nextRemindText = computed(() => {
-  if (!props.task.enabled) return '已结束';
+  if (props.task.endedAt) return '已结束';
   return relativeTime(props.task.nextRemindTime);
 });
 </script>

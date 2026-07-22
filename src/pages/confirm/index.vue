@@ -158,7 +158,7 @@ const task = ref<ReminderTask>({
   babyId: '',
   userId: '',
   type: 'feeding',
-  enabled: false,
+  endedAt: new Date().toISOString(),
   firstTime: '',
   intervalMinutes: 0,
   nextRemindTime: '',

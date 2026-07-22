@@ -328,7 +328,7 @@ function getTaskColor(type: TaskType | string): string {
         display: flex;
         flex-direction: column;
         min-width: 0;
-
+        text-align: center;
         .ec-num {
           font-size: 40rpx;
           font-weight: 700;

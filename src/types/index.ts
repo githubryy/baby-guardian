@@ -89,7 +89,8 @@ export interface ReminderTask {
   type: TaskType;
   /** 自定义名称 (type=custom 时使用) */
   customName?: string;
-  enabled: boolean;
+  /** 结束时间（ISO 8601），不存在表示活跃中 */
+  endedAt?: string;
   /** 首次提醒时间 (如 "08:00") */
   firstTime: string;
   /** 间隔分钟数 */

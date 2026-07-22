@@ -15,7 +15,7 @@ export const useTaskStore = defineStore('task', () => {
   const loading = ref(false);
 
   // ===== Getters =====
-  const activeTasks = computed(() => taskList.value.filter((t) => t.enabled));
+  const activeTasks = computed(() => taskList.value.filter((t) => !t.endedAt));
   const pendingItems = computed(() => timeline.value.filter((t) => t.status === 'pending'));
   const completedItems = computed(() => timeline.value.filter((t) => t.status === 'completed'));
   const overdueItems = computed(() => timeline.value.filter((t) => t.status === 'overdue'));
@@ -115,7 +115,7 @@ export const useTaskStore = defineStore('task', () => {
     }
   }
 
-  /** 启用/禁用事项 */
+  /** 结束/重开事项 */
   async function toggleTask(taskId: string, enabled: boolean) {
     try {
       const task = await taskApi.toggleTask(taskId, enabled);
@@ -171,9 +171,9 @@ export const useTaskStore = defineStore('task', () => {
           item.status = 'delayed';
         } else if (data.action === 'stopped') {
           item.status = 'stopped';
-          // 同时在 taskList 中禁用该任务，使其不可恢复
+          // 同时在 taskList 中结束该任务，使其不可恢复
           const task = taskList.value.find((t) => t._id === data.taskId);
-          if (task) task.enabled = false;
+          if (task) task.endedAt = new Date().toISOString();
         } else if (data.action === 'paused') {
           item.status = 'paused';
         } else if (data.action === 'restart') {

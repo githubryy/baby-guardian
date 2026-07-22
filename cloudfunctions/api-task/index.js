@@ -96,7 +96,6 @@ async function handleAdd(userId, familyId, data) {
     ...data,
     userId,
     familyId,
-    enabled: true,
     nextRemindTime: firstRemindDate.toISOString(),
     lastCompletedTime: null,
     lastCompletedBy: null,
@@ -131,9 +130,13 @@ async function handleDelete(taskId) {
   return success(null, '删除成功');
 }
 
-/** 启用/禁用事项 */
+/** 结束/重开事项 */
 async function handleToggle(taskId, enabled) {
-  await db.collection('reminder_tasks').doc(taskId).update({ data: { enabled } });
+  const now = new Date().toISOString();
+  // enabled=true 表示重开（清除 endedAt），false 表示结束（记录 endedAt）
+  await db.collection('reminder_tasks').doc(taskId).update({
+    data: enabled ? { endedAt: null } : { endedAt: now },
+  });
   const { data: updated } = await db.collection('reminder_tasks').doc(taskId).get();
   return success(updated);
 }
@@ -165,7 +168,7 @@ async function handleTimeline(userId, familyId, babyId) {
   const { data: tasks } = await db.collection('reminder_tasks')
     .where({
       familyId,
-      enabled: true,
+      endedAt: _.exists(false),
       nextRemindTime: _.lte(todayEnd.toISOString()),
     })
     .orderBy('nextRemindTime', 'desc')
@@ -274,7 +277,7 @@ async function handleTimeline(userId, familyId, babyId) {
   });
 
   // 补充今日确认/延迟过但 nextRemindTime 已跨天的任务，以及今日被停止的任务
-  // （这些任务被 todayEnd 或 enabled 过滤掉了，需要单独补回）
+  // （这些任务被 todayEnd 或 endedAt 过滤掉了，需要单独补回）
   const taskInTimelineIds = new Set(timeline.map(t => t.taskId));
   const supplementIds = new Set(
     Array.from(confirmedTaskIds).filter(id => !taskInTimelineIds.has(id))

@@ -90,12 +90,13 @@ async function handleConfirm(userId, familyId, currentUser, data) {
       const nextRemind = new Date();
       nextRemind.setMinutes(nextRemind.getMinutes() + task.intervalMinutes);
       updateData.nextRemindTime = nextRemind.toISOString();
-      // 有限循环且已完成全部次数 → 自动停用
+      // 有限循环且已完成全部次数 → 自动结束
       if (task.repeatCount > 0 && updateData.completedCount >= task.repeatCount) {
-        updateData.enabled = false;
+        updateData.endedAt = now;
       }
     } else {
-      updateData.enabled = false;
+      // 一次性任务完成 → 自动结束
+      updateData.endedAt = now;
     }
     // 一次性任务: 不更新 nextRemindTime（已完成无需再次提醒）
     await db.collection('reminder_tasks').doc(taskId).update({ data: updateData });
@@ -117,10 +118,10 @@ async function handleConfirm(userId, familyId, currentUser, data) {
       },
     });
   } else if (action === 'stopped') {
-    // 停止: 永久停用该事项，不可恢复，只能重新发起，清除显著超时标识
+    // 停止: 结束该事项，不可恢复，只能重新发起，清除显著超时标识
     await db.collection('reminder_tasks').doc(taskId).update({
       data: {
-        enabled: false,
+        endedAt: now,
         isOverdueCritically: false,
         overdueDetectedAt: null,
         processingLock: false,

@@ -88,13 +88,7 @@ async function handleSummary(userId, familyId, babyId) {
   // 事项数量
   const taskQuery = buildTaskQuery(familyId, babyId);
   const { total: totalTasks } = await db.collection('reminder_tasks').where(taskQuery).count();
-  const { total: activeTasks } = await db.collection('reminder_tasks').where({ ...taskQuery, enabled: true }).count();
-
-  // 今日提醒数
-  const { data: todayTasks } = await db.collection('reminder_tasks')
-    .where({ ...taskQuery, enabled: true, nextRemindTime: _.lte(today.end.toISOString()) })
-    .get();
-  const todayReminders = todayTasks.length;
+  const { total: activeTasks } = await db.collection('reminder_tasks').where({ ...taskQuery, endedAt: _.exists(false) }).count();
 
   // 最近 7 天日期
   const dates = Array.from({ length: 7 }, (_, i) => {
@@ -105,7 +99,7 @@ async function handleSummary(userId, familyId, babyId) {
   const weekStart = dayBoundaries(dates[0]).start;
   const weekEnd = dayBoundaries(dates[6]).end;
 
-  // 一次查询整周 confirm_logs（同时提供今日完成/停止 + 周统计）
+  // 一次查询整周 confirm_logs（同时提供今日总事件/完成/停止 + 周统计）
   const { data: weekLogs } = await db.collection('confirm_logs')
     .where({
       familyId,
@@ -113,20 +107,33 @@ async function handleSummary(userId, familyId, babyId) {
     })
     .get();
 
-  // 从 weekLogs 中提取今日数据，避免重复查询
+  // 今日总事件数 = confirm_logs 中今日所有记录（分母，口径与分子一致）
+  const todayReminders = weekLogs.filter(
+    (l) => l.completedTime >= today.start.toISOString()
+  ).length;
+
+  // 获取所有事项（用于 totalEvents 统计）
+  const { data: allTasks } = await db.collection('reminder_tasks')
+    .where(taskQuery)
+    .field({ endedAt: true, completedCount: true })
+    .get();
+
+  // 今日已完成：从 confirm_logs 按日期过滤（completedCount 是累加值，无法按日拆分）
   const todayCompleted = weekLogs.filter(
     (l) => l.action === 'completed' && l.completedTime >= today.start.toISOString()
   ).length;
   const todayCompletionRate = calcRate(todayCompleted, todayReminders);
 
   // 一次查询所有显著超时（替代原来的 total + weekly 两次查询）
+  // 注意：事项完成后 isOverdueCritically 会被重置为 false，但 overdueCriticallyCount 与 overdueTimeoutAt 仍保留，
+  // 因此按 overdueCriticallyCount > 0 统计，避免遗漏已完成的显著超时事件。
   const { data: criticalTasks } = await db.collection('reminder_tasks')
-    .where({ ...taskQuery, isOverdueCritically: true })
+    .where({ ...taskQuery, overdueCriticallyCount: _.gt(0) })
     .get();
-  const totalCriticallyOverdue = criticalTasks.length;
-  const todayCriticallyOverdue = criticalTasks.filter(
-    (t) => t.overdueTimeoutAt >= today.start.toISOString()
-  ).length;
+  const totalCriticallyOverdue = criticalTasks.reduce((sum, t) => sum + (t.overdueCriticallyCount || 0), 0);
+  const todayCriticallyOverdue = criticalTasks
+    .filter((t) => t.overdueTimeoutAt >= today.start.toISOString())
+    .reduce((sum, t) => sum + (t.overdueCriticallyCount || 0), 0);
 
   // 停止事件：total 用 count 替代 get，today 从 weekLogs 提取
   const { total: totalStopped } = await db.collection('confirm_logs')
@@ -141,7 +148,8 @@ async function handleSummary(userId, familyId, babyId) {
     .where({ familyId, action: 'completed' })
     .count();
 
-  const totalEvents = totalCompleted + totalStopped + totalCriticallyOverdue;
+  // 事件总数 = 每个事项的 completedCount 之和 + 每个未结束事项 +1（当前待处理实例）
+  const totalEvents = allTasks.reduce((sum, t) => sum + (t.completedCount || 0) + (!t.endedAt ? 1 : 0), 0);
 
   // 按日期分组 weekLogs
   const weekMap = {};
@@ -199,7 +207,6 @@ async function handleDaily(userId, familyId, params) {
   const { data: criticallyOverdueTasks } = await db.collection('reminder_tasks')
     .where({
       ...taskQuery,
-      isOverdueCritically: true,
       overdueTimeoutAt: _.gte(range.start.toISOString()).and(_.lte(range.end.toISOString())),
     })
     .get();
@@ -220,7 +227,7 @@ async function handleDaily(userId, familyId, params) {
 
   criticallyOverdueTasks.forEach((t) => {
     const day = ensureDay(toDateStr(new Date(t.overdueTimeoutAt || t.createdAt)));
-    day.criticallyOverdueCount++;
+    day.criticallyOverdueCount += t.overdueCriticallyCount || 1;
   });
 
   Object.values(dayMap).forEach((d) => { d.completionRate = calcRate(d.completedCount, d.totalReminders); });

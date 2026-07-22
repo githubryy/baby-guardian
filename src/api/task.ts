@@ -42,7 +42,7 @@ export function deleteTask(taskId: string): Promise<void> {
   return callCloud<void>(CLOUD_FUNCTIONS.TASK, { action: 'delete', taskId });
 }
 
-/** 启用/禁用事项 */
+/** 结束/重开事项 */
 export function toggleTask(taskId: string, enabled: boolean): Promise<ReminderTask> {
   return callCloud<ReminderTask>(CLOUD_FUNCTIONS.TASK, { action: 'toggle', taskId, enabled });
 }
