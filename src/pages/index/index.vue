@@ -737,8 +737,8 @@ async function handleStop(item: TimelineItem) {
         }
 
         &.paused-dot {
-          background: #7f77dd;
-          box-shadow: 0 0 0 4rpx rgba(127, 119, 221, 0.15);
+          background: #5b8def;
+          box-shadow: 0 0 0 4rpx rgba(91, 141, 239, 0.15);
         }
       }
 

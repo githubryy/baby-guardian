@@ -18,7 +18,8 @@
         </view>
         <view class="header-tags">
           <u-tag :text="priorityConfig.name" :type="priorityTagType" size="mini" shape="circle" plain />
-          <u-tag v-if="item.taskMode && (item.taskMode === 'recurring')" text="循环" type="error" size="mini" shape="circle" />
+          <u-tag v-if="item.taskMode && (item.taskMode === 'recurring')" text="循环" type="error" size="mini"
+            shape="circle" />
         </view>
       </view>
 
@@ -44,7 +45,8 @@
         </view>
 
         <!-- 循环事件: 下次执行时间 -->
-        <view v-if="item.taskMode === 'recurring' && nextRemindTimeDisplay && item.status === 'pending'" class="next-remind-row">
+        <view v-if="item.taskMode === 'recurring' && nextRemindTimeDisplay && item.status === 'pending'"
+          class="next-remind-row">
           <u-icon name="reload" :size="13" color="#ff7b7b" />
           <text class="next-remind-label">下次执行</text>
           <text class="next-remind-remaining">{{ item.nextRemindRemaining }}</text>
@@ -53,8 +55,10 @@
         <!-- 完成者信息（家庭协作） -->
         <view v-if="item.status === 'completed' && item.completedByName" class="operator-row">
           <view class="operator-avatar" :style="{ background: getRelationBg(item.completedByRelation) }">
-            <image v-if="item.completedByAvatar" :src="item.completedByAvatar" mode="aspectFill" class="op-avatar-img" />
-            <u-icon v-else :name="getRelationIcon(item.completedByRelation)" :size="14" :color="getRelationColor(item.completedByRelation)" />
+            <image v-if="item.completedByAvatar" :src="item.completedByAvatar" mode="aspectFill"
+              class="op-avatar-img" />
+            <u-icon v-else :name="getRelationIcon(item.completedByRelation)" :size="14"
+              :color="getRelationColor(item.completedByRelation)" />
           </view>
           <text class="operator-name">{{ item.completedByName }}</text>
           <!-- <text class="operator-relation" :style="{ color: getRelationColor(item.completedByRelation) }">{{ getRelationName(item.completedByRelation) }}</text> -->
@@ -62,7 +66,9 @@
         </view>
 
         <!-- 指定负责人（家庭协作） -->
-        <view v-if="(item.status === 'pending' || item.status === 'overdue' || item.status === 'paused') && item.assigneeName" class="assignee-row">
+        <view
+          v-if="(item.status === 'pending' || item.status === 'overdue' || item.status === 'paused') && item.assigneeName"
+          class="assignee-row">
           <u-icon name="account-fill" :size="12" color="#ccc" />
           <text class="assignee-text">负责人：{{ item.assigneeName }}</text>
         </view>
@@ -79,7 +85,7 @@
           <text class="action-label">延迟</text>
         </view>
         <view class="action-btn pause tap-feedback" @tap.stop="$emit('pause', item)">
-          <u-icon name="pause-circle-fill" :size="16" color="#7f77dd" />
+          <u-icon name="pause-circle-fill" :size="16" color="#5b8def" />
           <text class="action-label">暂停</text>
         </view>
       </view>
@@ -95,14 +101,14 @@
           <text class="action-label">结束</text>
         </view>
         <view class="action-btn restart tap-feedback" @tap.stop="$emit('restart', item)">
-          <u-icon name="play-circle-fill" :size="16" color="#1d9e75" />
+          <u-icon name="play-circle-fill" :size="16" color="#17a2b8" />
           <text class="action-label">重启</text>
         </view>
       </view>
 
       <!-- 暂停状态标识 -->
       <view v-if="item.status === 'paused'" class="paused-info-row">
-        <u-icon name="pause-circle" :size="14" color="#7f77dd" />
+        <u-icon name="pause-circle" :size="14" color="#5b8def" />
         <text class="paused-info-text">已暂停 · 可重启恢复提醒</text>
       </view>
     </view>
@@ -179,7 +185,7 @@ const dotColor = computed(() => {
   if (props.item.status === 'completed') return '#1d9e75';
   if (props.item.status === 'delayed') return '#ef9f27';
   if (props.item.status === 'stopped') return '#7f77dd';
-  if (props.item.status === 'paused') return '#7f77dd';
+  if (props.item.status === 'paused') return '#5b8def';
   return safeTypeColor.value;
 });
 
@@ -253,7 +259,7 @@ function getRelationBg(relation?: FamilyRelation) {
 
 
 
-    /* 循环进度信息 */
+  /* 循环进度信息 */
 
   .card-header {
     display: flex;
@@ -351,7 +357,7 @@ function getRelationBg(relation?: FamilyRelation) {
       }
 
       .next-remind-remaining {
-         font-size: 24rpx;
+        font-size: 24rpx;
         color: #ff7b7b;
         font-weight: 600;
         margin-left: auto;
@@ -432,22 +438,6 @@ function getRelationBg(relation?: FamilyRelation) {
         color: #ccc;
       }
     }
-
-    /* 暂停提示 */
-    .paused-info-row {
-      display: flex;
-      align-items: center;
-      gap: 6rpx;
-      margin-top: 12rpx;
-      padding: 10rpx 16rpx;
-      background: #f0eefb;
-      border-radius: 8rpx;
-
-      .paused-info-text {
-        font-size: 22rpx;
-        color: #7f77dd;
-      }
-    }
   }
 
   .card-actions {
@@ -488,13 +478,13 @@ function getRelationBg(relation?: FamilyRelation) {
       }
 
       &.pause {
-        background: #f0eefb;
-        color: #7f77dd;
+        background: #eaf3fe;
+        color: #5b8def;
       }
 
       &.restart {
-        background: #e4f5ee;
-        color: #1d9e75;
+        background: #e7f7f9;
+        color: #17a2b8;
       }
 
       &.stop {
@@ -502,6 +492,22 @@ function getRelationBg(relation?: FamilyRelation) {
         color: #aaa;
       }
     }
+  }
+
+  /* 暂停提示 */
+  .paused-info-row {
+    display: flex;
+    align-items: center;
+    gap: 6rpx;
+    margin-top: 12rpx;
+      padding: 10rpx 16rpx;
+      background: #eaf3fe;
+      border-radius: 8rpx;
+
+      .paused-info-text {
+        font-size: 22rpx;
+        color: #5b8def;
+      }
   }
 
   /* 状态样式 */
@@ -536,7 +542,7 @@ function getRelationBg(relation?: FamilyRelation) {
 
   &.paused {
     .content-card {
-      border-left: 6rpx solid #7f77dd;
+      border-left: 6rpx solid #5b8def;
       opacity: 0.85;
     }
   }

@@ -179,11 +179,13 @@ async function handleHistory(userId, familyId, params = {}) {
   if (taskType) query.taskType = taskType;
   if (startDate || endDate) {
     query.completedTime = {};
-    if (startDate) query.completedTime = _.gte(startDate);
-    if (endDate) {
-      query.completedTime = startDate
-        ? _.gte(startDate).and(_.lte(endDate))
-        : _.lte(endDate);
+    const start = startDate ? `${startDate}T00:00:00.000Z` : null;
+    const end = endDate ? `${endDate}T23:59:59.999Z` : null;
+    if (start) query.completedTime = _.gte(start);
+    if (end) {
+      query.completedTime = start
+        ? _.gte(start).and(_.lte(end))
+        : _.lte(end);
     }
   }
 

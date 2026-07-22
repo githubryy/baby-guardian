@@ -95,7 +95,7 @@
         <!-- 暂停提醒 -->
         <view class="action-item tap-feedback" @tap="onPauseRemind">
           <view class="action-icon-wrap pause-bg">
-            <u-icon name="pause-circle-fill" :size="28" color="#7f77dd" />
+            <u-icon name="pause-circle-fill" :size="28" color="#5b8def" />
           </view>
           <view class="action-text">
             <text class="action-name">暂停提醒</text>
@@ -107,7 +107,7 @@
         <!-- 结束该事件 -->
         <view class="action-item pause tap-feedback" @tap="onPause">
           <view class="action-icon-wrap pause-bg">
-            <u-icon name="pause-circle-fill" :size="28" color="#7f77dd" />
+            <u-icon name="pause-circle-fill" :size="28" color="#5b8def" />
           </view>
           <view class="action-text">
             <text class="action-name">结束该事件</text>
@@ -380,8 +380,8 @@ async function onPauseRemind() {
   if (submitting.value) return;
   uni.showModal({
     title: '暂停提醒',
-    content: '暂停后，该事项将不会标记为超时或推送提醒，但你可以随时完成、延迟或重启它。',
-    confirmColor: '#7f77dd',
+    content: '暂停后，该事项将不会标记为超时或推送提醒，但你可以随时完成、结束或重启它。',
+    confirmColor: '#5b8def',
     success: async (res) => {
       if (res.confirm) {
         submitting.value = true;
@@ -604,7 +604,7 @@ async function onSupplementQuota() {
         }
 
         &.pause-bg {
-          background: linear-gradient(135deg, #f3f0fc, #e8e4f8);
+          background: linear-gradient(135deg, #edf3fe, #dce8fc);
         }
       }
 
