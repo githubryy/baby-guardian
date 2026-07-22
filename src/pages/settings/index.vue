@@ -79,7 +79,7 @@
     </view>
 
     <!-- 提醒设置 -->
-    <view class="section slide-up" style="animation-delay: 0.18s">
+    <!-- <view class="section slide-up" style="animation-delay: 0.18s">
       <view class="section-title">提醒设置</view>
       <view class="menu-list">
         <view class="menu-item">
@@ -116,7 +116,7 @@
           </picker>
         </view>
       </view>
-    </view>
+    </view> -->
     
     <!-- 账户设置 -->
     <view class="section slide-up" style="animation-delay: 0.06s">

@@ -420,6 +420,10 @@ async function handlePause(item: TimelineItem) {
 }
 
 async function handleRestart(item: TimelineItem) {
+  // 在 tap 上下文中先发起订阅授权，避免 await 后丢失手势上下文
+  const accepted = await guideBatchAuthorization('重启提醒后', item.type);
+  if (accepted === 0) return; // 用户取消授权，不执行后续操作
+
   // 判断是否超时
   const now = Date.now();
   const remindTime = item.nextRemindTime ? new Date(item.nextRemindTime).getTime() : now;
@@ -444,6 +448,7 @@ async function handleRestart(item: TimelineItem) {
       taskMode: item.taskMode,
       completedCount: item.completedCount
     });
+    userStore.refreshQuota();
     loadData();
   } catch (e: any) {
     console.error('[handleRestart] 操作失败:', e);
