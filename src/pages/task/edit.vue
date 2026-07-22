@@ -32,6 +32,26 @@
           maxlength="20" />
       </view>
 
+      <!-- 指定执行人 -->
+      <view class="form-item">
+        <text class="form-label">指定执行人</text>
+        <view class="assignee-row">
+          <view class="assignee-option" :class="{ active: !form.assigneeId }" @tap="form.assigneeId = ''">
+            <text class="assignee-name">不指定</text>
+          </view>
+          <view
+            v-for="member in familyMembers"
+            :key="member.userId"
+            class="assignee-option"
+            :class="{ active: form.assigneeId === member.userId }"
+            @tap="form.assigneeId = member.userId"
+          >
+            <text class="assignee-relation">{{ FAMILY_RELATION_CONFIG[member.relation]?.shortName || member.relation }}</text>
+            <text class="assignee-name">{{ member.nickName || '成员' }}</text>
+          </view>
+        </view>
+      </view>
+
       <!-- 优先级 -->
       <view class="form-item">
         <text class="form-label">优先级</text>
@@ -188,13 +208,15 @@ import { ref, computed, watch } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
 import { useTaskStore } from '@/stores/task';
 import { useBabyStore } from '@/stores/baby';
+import { useFamilyStore } from '@/stores/family';
 import { getTaskDetail } from '@/api/task';
-import { TASK_TYPE_OPTIONS, PRIORITY_OPTIONS, TASK_TYPE_CONFIG, DEFAULT_WINDOW } from '@/utils/constants';
+import { TASK_TYPE_OPTIONS, PRIORITY_OPTIONS, TASK_TYPE_CONFIG, DEFAULT_WINDOW, FAMILY_RELATION_CONFIG } from '@/utils/constants';
 import { guideBatchAuthorization } from '@/utils/subscribe';
 import type { TaskType, TaskPriority, WindowSkipStrategy, TaskMode } from '@/types';
 
 const taskStore = useTaskStore();
 const babyStore = useBabyStore();
+const familyStore = useFamilyStore();
 
 const isEdit = ref(false);
 const editId = ref('');
@@ -212,6 +234,7 @@ const form = ref({
   priority: 'p1' as TaskPriority,
   taskMode: 'once' as TaskMode,
   repeatCount: -1,
+  assigneeId: '',
 });
 
 const intervalPresets = [
@@ -229,6 +252,15 @@ const priorityHint = computed(() => {
   if (form.value.priority === 'p1') return '重要事项，使用订阅消息推送';
   return '普通事项，使用小程序内通知（不消耗配额）';
 });
+
+const familyMembers = computed(() => familyStore.members || []);
+
+// 默认执行人：育儿阿姨 > 第一位家庭成员
+watch(familyMembers, (members) => {
+  if (isEdit.value || !members.length || form.value.assigneeId) return;
+  const nanny = members.find((m) => m.relation === 'nanny');
+  form.value.assigneeId = nanny ? nanny.userId : members[0].userId;
+}, { immediate: true });
 
 // 阻止选择的类型集合（只有已完成和已结束的事件才可以重复选择）
 const activeTaskTypes = computed(() => {
@@ -313,6 +345,7 @@ async function loadTaskDetail() {
       priority: task.priority,
       taskMode: task.taskMode || 'once',
       repeatCount: task.repeatCount ?? -1,
+      assigneeId: task.assigneeId || '',
     };
     !intervalPresets.some((p) => p.value === task.intervalMinutes) && (customIntervalStr.value = String(task.intervalMinutes))
     uni.setNavigationBarTitle({ title: '编辑事项' });
@@ -362,6 +395,7 @@ async function onSave() {
       priority: form.value.priority,
       taskMode: form.value.taskMode,
       repeatCount: form.value.taskMode === 'recurring' ? form.value.repeatCount : -1,
+      assigneeId: form.value.assigneeId || undefined,
     };
 
     if (isEdit.value) {
@@ -521,6 +555,48 @@ async function onDelete() {
 
     &.active {
       font-weight: 600;
+    }
+  }
+}
+
+// 指定执行人
+.assignee-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+
+  .assignee-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4rpx;
+    padding: 16rpx 24rpx;
+    background: #f5f5f5;
+    border-radius: 12rpx;
+    border: 2rpx solid transparent;
+    min-width: 120rpx;
+
+    &.active {
+      background: #fff0f0;
+      border-color: #ff7b7b;
+      color: #ff7b7b;
+    }
+
+    .assignee-relation {
+      font-size: 22rpx;
+      color: #999;
+    }
+
+    .assignee-name {
+      font-size: 26rpx;
+      color: #333;
+      font-weight: 500;
+    }
+
+    &.active {
+      .assignee-relation, .assignee-name {
+        color: #ff7b7b;
+      }
     }
   }
 }

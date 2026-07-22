@@ -1,11 +1,12 @@
 <template>
-  <view class="task-item tap-shrink" :class="{ disabled: task.endedAt }" @tap="$emit('itemTap', task)">
+  <view class="task-item tap-shrink" :class="{ disabled: task.endedAt, critical: isCritical }" @tap="$emit('itemTap', task)">
     <view class="type-icon" :style="{ background: typeConfig.bgColor }">
       <u-icon :name="typeConfig.icon" :size="30" :color="typeConfig.color" />
     </view>
     <view class="task-info">
       <view class="info-header">
         <text class="task-name">{{ task.customName || typeConfig.name }}</text>
+        <u-tag text="显著超时" type="error" size="mini" shape="circle" v-if="isCritical" />
         <u-tag :text="modeConfig.name" :type="modeTagType" size="mini" shape="circle" plain />
         <u-tag :text="priorityConfig.name" :type="priorityTagType" size="mini" shape="circle" plain />
       </view>
@@ -61,6 +62,9 @@ const enabledProxy = computed({
 });
 
 const intervalText = computed(() => durationText(props.task.intervalMinutes));
+
+const isCritical = computed(() => !!props.task.isOverdueCritically);
+
 const nextRemindText = computed(() => {
   if (props.task.endedAt) return '已结束';
   return relativeTime(props.task.nextRemindTime);
@@ -81,6 +85,12 @@ const nextRemindText = computed(() => {
 
   &.disabled {
     opacity: 0.6;
+  }
+
+  &.critical {
+    border-color: #ffcdd2;
+    background: linear-gradient(135deg, #fff5f5, #fff);
+    box-shadow: 0 2rpx 12rpx rgba(238, 106, 105, 0.12);
   }
 
   .type-icon {

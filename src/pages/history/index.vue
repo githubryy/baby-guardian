@@ -70,6 +70,7 @@
               <view class="item-action-wrap">
                 <view class="action-dot" :class="item.action" />
                 <text class="item-action" :class="item.action">{{ actionText(item.action) }}</text>
+                <u-tag text="显著超时" type="error" size="mini" shape="circle" plain v-if="item.isOverdueCritically" />
                 <!-- 操作人信息（家庭协作） -->
                 <template v-if="item.operatorName">
                   <text class="operator-sep">·</text>

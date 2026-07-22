@@ -196,7 +196,7 @@ exports.main = async (event, context) => {
         }
 
         // 4d. 获取家庭所有成员的配额
-        const familyQuotas = await getFamilyQuotas(task);
+        const { quotas: familyQuotas, members } = await getFamilyQuotas(task);
         if (familyQuotas.length === 0) {
           console.log(`[cron-scan] 事项 ${task._id} 家庭配额不足`);
           quotaExhausted++;
@@ -207,7 +207,7 @@ exports.main = async (event, context) => {
         // 4e. 向有配额的家庭成员发送订阅消息
         let anySuccess = false;
         for (const fq of familyQuotas) {
-          const sendResult = await sendSubscriptionMessage(task, fq);
+          const sendResult = await sendSubscriptionMessage(task, fq, members);
           await logNotification(
             task,
             fq,
@@ -344,21 +344,30 @@ async function getFamilyQuotas(task) {
     }
   }
 
-  return result;
+  return { quotas: result, members: family?.members || [] };
 }
 
 /**
  * 发送订阅消息
  */
-async function sendSubscriptionMessage(task, familyQuota) {
+async function sendSubscriptionMessage(task, familyQuota, members) {
   try {
     const { data: baby } = await db.collection("babies").doc(task.babyId).get();
 
     const templateKey = TYPE_TEMPLATE_MAP[task.type];
     const templateId = TEMPLATES[templateKey];
 
+    // 查找执行人信息
+    let assigneeName = "";
+    if (task.assigneeId && members) {
+      const assignee = members.find((m) => m.userId === task.assigneeId);
+      if (assignee) {
+        assigneeName = assignee.nickName || assignee.relation || "成员";
+      }
+    }
+
     // 构建消息数据 (根据模板字段配置)
-    const sendData = buildMessageData(task, baby, templateKey);
+    const sendData = buildMessageData(task, baby, templateKey, assigneeName);
     const result = await cloud.openapi.subscribeMessage.send({
       touser: familyQuota.openId,
       templateId,
@@ -394,38 +403,57 @@ async function sendSubscriptionMessage(task, familyQuota) {
 /**
  * 构建订阅消息数据
  * 根据模板类型构建不同字段
+ * 内容四要素：事件类型 + 重要程度 + 是否循环 + 执行人
  */
-function buildMessageData(task, baby, templateKey) {
+function buildMessageData(task, baby, templateKey, assigneeName) {
   const now = new Date();
   const beijingTime = new Date(now.getTime() + 8 * 3600 * 1000);
   const timeStr = `${String(beijingTime.getUTCHours()).padStart(2, "0")}:${String(beijingTime.getUTCMinutes()).padStart(2, "0")}`;
   const babyName = baby?.name || "宝宝";
-  const taskName = task.customName || "";
+
+  // 事件类型
+  const typeNames = { feeding: "喂养", diaper: "尿布", sleep: "睡眠", vitamin: "维生素", medicine: "用药" };
+  const typeName = typeNames[task.type] || task.customName || "提醒";
+
+  // 重要程度（短码适配 thing 字段 20 字符限制）
+  const priorityNames = { p0: "紧急", p1: "重要", p2: "普通" };
+  const priorityName = priorityNames[task.priority] || "普通";
+
+  // 是否循环
+  const recurringTag = (task.taskMode === "recurring" || task.intervalMinutes) ? "循环" : "单次";
+
+  // 适配模板 thing 字段 20 字符限制
+  // 一行展示：宝宝名 + 类型 + 优先级 + 循环标识 + 执行人
+  let mainText = `${babyName}${typeName}·${priorityName}·${recurringTag}`;
+  if (assigneeName) {
+    mainText += `@${assigneeName}`;
+  }
 
   switch (templateKey) {
     case "feeding":
-      // 模板ID: cJTFL... (签到提醒) — 字段: time11(任务时间), thing1(活动名称)
+      // 模板ID: cJTFL... (签到提醒) — 字段: thing1(活动名称), time11(任务时间)
       return {
-        thing1: { value: `${babyName} ${taskName || "喂养"}` },
+        thing1: { value: mainText },
         time11: { value: timeStr },
       };
     case "care":
       // 模板ID: WvNgD... (定时维护提醒) — 字段: time3(提醒时间), thing4(提醒内容)
       return {
         time3: { value: timeStr },
-        thing4: { value: `${babyName} ${taskName || "护理"}` },
+        thing4: { value: mainText },
       };
     case "medicine":
       // 模板ID: Iqg9G... (日程提醒) — 字段: thing2(提醒内容), time3(执行时间), thing8(紧急度)
+      // thing8 展示：重要程度 + 执行人
       return {
-        thing2: { value: `${babyName} ${taskName || "用药"}` },
+        thing2: { value: mainText },
         time3: { value: timeStr },
-        thing8: { value: "普通" },
+        thing8: { value: assigneeName ? `${priorityName}·${assigneeName}` : priorityName },
       };
     default:
       return {
         time3: { value: timeStr },
-        thing4: { value: "提醒" },
+        thing4: { value: mainText },
       };
   }
 }

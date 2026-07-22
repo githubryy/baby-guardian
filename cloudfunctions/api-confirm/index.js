@@ -66,6 +66,8 @@ async function handleConfirm(userId, familyId, currentUser, data) {
     taskMode: task.taskMode || 'once',
     // 循环事件：延迟/忽略时也保留当前的 completedCount
     completedCount,
+    // 记录事项是否显著超时
+    isOverdueCritically: task.isOverdueCritically || false,
     createdAt: now,
   };
   const { _id: logId } = await db.collection('confirm_logs').add({ data: log });

@@ -70,8 +70,8 @@
               </view>
               <view class="stat-divider" />
               <view class="stat-item">
-                <text class="stat-num overdue">{{ overdueCount }}</text>
-                <text class="stat-label">已超时</text>
+                <text class="stat-num overdue">{{ overdueCriticallyCount }}</text>
+                <text class="stat-label">显著超时</text>
               </view>
             </view>
             <!-- 进度条 -->
@@ -199,8 +199,8 @@ const refreshing = ref(false);
 const loading = ref(false);
 
 const pendingCount = computed(() => pendingItems.value.length);
-const completedCount = computed(() => completedItems.value.length);
-const overdueCount = computed(() => overdueItems.value.length);
+const completedCount = computed(() => timeline.value.reduce((sum, item) => sum + (item.completedCount || 0), 0));
+const overdueCriticallyCount = computed(() => timeline.value.reduce((sum, item) => sum + (item.overdueCriticallyCount || 0), 0));
 
 const todayText = computed(() => {
   const d = new Date();
@@ -228,7 +228,7 @@ const avatarBg = computed(() => {
   return '#F5F5F5';
 });
 
-const totalToday = computed(() => pendingItems.value.length + completedItems.value.length + overdueItems.value.length);
+const totalToday = computed(() => pendingItems.value.length + completedItems.value.length + overdueCriticallyCount.value);
 const progressPercent = computed(() => {
   if (totalToday.value === 0) return 0;
   return Math.round((completedItems.value.length / totalToday.value) * 100);

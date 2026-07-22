@@ -65,6 +65,7 @@ export const useTaskStore = defineStore('task', () => {
     priority: TaskPriority;
     taskMode: TaskMode;
     repeatCount: number;
+    assigneeId?: string;
   }): Promise<boolean> {
     showLoading('保存中...');
     try {

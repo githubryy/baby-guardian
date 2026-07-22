@@ -121,6 +121,12 @@ export interface ReminderTask {
   repeatCount: number;
   /** 已完成循环次数 (仅 taskMode=recurring 时有效) */
   completedCount: number;
+  /** 是否显著超时（超过提醒时间 10 分钟未处理） */
+  isOverdueCritically?: boolean;
+  /** 触发显著超时的时间 */
+  overdueTimeoutAt?: string;
+  /** 显著超时累计次数 */
+  overdueCriticallyCount?: number;
   createdAt: string;
 }
 
@@ -158,6 +164,8 @@ export interface ConfirmLog {
   taskMode?: TaskMode;
   /** 循环事件已完成次数（仅 taskMode=recurring 且 action=completed 时有值，旧数据可能缺失） */
   completedCount?: number;
+  /** 是否显著超时（来自事项标记，旧数据可能缺失） */
+  isOverdueCritically?: boolean;
   createdAt: string;
 }
 
@@ -350,6 +358,10 @@ export interface TimelineItem {
   nextRemindTime: string;
   /** 下次执行剩余时间文本 - 云函数计算下发 */
   nextRemindRemaining?: string;
+  /** 是否显著超时 */
+  isOverdueCritically?: boolean;
+  /** 显著超时累计次数 */
+  overdueCriticallyCount?: number;
 }
 
 // ==================== API 通用类型 ====================

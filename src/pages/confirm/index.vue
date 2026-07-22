@@ -106,8 +106,8 @@
 
         <!-- 结束该事件 -->
         <view class="action-item pause tap-feedback" @tap="onPause">
-          <view class="action-icon-wrap pause-bg">
-            <u-icon name="pause-circle-fill" :size="28" color="#5b8def" />
+          <view class="action-icon-wrap ended-bg">
+            <u-icon name="close-circle-fill" :size="28" color="#ff746af5" />
           </view>
           <view class="action-text">
             <text class="action-name">结束该事件</text>
@@ -605,6 +605,10 @@ async function onSupplementQuota() {
 
         &.pause-bg {
           background: linear-gradient(135deg, #edf3fe, #dce8fc);
+        }
+
+        &.ended-bg {
+          background: linear-gradient(135deg, #fefced, #fce2dc);
         }
       }
 

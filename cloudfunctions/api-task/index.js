@@ -250,6 +250,8 @@ async function handleTimeline(userId, familyId, babyId) {
       intervalMinutes: task.intervalMinutes ?? null,
       nextRemindTime: task.nextRemindTime || task.createdAt,
       nextRemindRemaining: isRecurring ? getRemainingText(task.nextRemindTime) : null,
+      isOverdueCritically: task.isOverdueCritically || false,
+      overdueCriticallyCount: task.overdueCriticallyCount || 0,
     };
   }
 

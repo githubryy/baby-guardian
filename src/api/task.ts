@@ -28,6 +28,7 @@ export function addTask(data: {
   priority: TaskPriority;
   taskMode: TaskMode;
   repeatCount: number;
+  assigneeId?: string;
 }): Promise<ReminderTask> {
   return callCloud<ReminderTask>(CLOUD_FUNCTIONS.TASK, { action: 'add', data });
 }

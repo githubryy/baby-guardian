@@ -1,5 +1,5 @@
 <template>
-  <view class="timeline-item" :class="item.status">
+  <view class="timeline-item" :class="[item.status, { critical: isCritical }]">
     <!-- 时间线连接线 -->
     <view class="timeline-line">
       <view class="time-dot" :style="{ background: dotColor }" />
@@ -17,6 +17,7 @@
           <text v-if="item.customName" class="custom-name">{{ item.customName }}</text>
         </view>
         <view class="header-tags">
+          <u-tag text="显著" type="error" size="mini" shape="circle" v-if="isCritical" />
           <u-tag :text="priorityConfig.name" :type="priorityTagType" size="mini" shape="circle" plain />
           <u-tag v-if="item.taskMode && (item.taskMode === 'recurring')" text="循环" type="error" size="mini"
             shape="circle" />
@@ -179,6 +180,8 @@ const nextRemindTimeDisplay = computed(() => {
   const next = new Date(remindDate.getTime() + props.item.intervalMinutes * 60 * 1000);
   return formatTime(next.toISOString());
 });
+
+const isCritical = computed(() => !!props.item.isOverdueCritically);
 
 const dotColor = computed(() => {
   if (props.item.status === 'overdue') return '#e24b4a';
@@ -524,6 +527,15 @@ function getRelationBg(relation?: FamilyRelation) {
 
     .time-dot {
       box-shadow: 0 0 0 6rpx rgba(226, 75, 74, 0.15);
+    }
+  }
+
+  /* 显著超时样式 */
+  &.critical {
+    .content-card {
+      border: 2rpx solid #e24b4a;
+      background: linear-gradient(135deg, #fff5f5, #fff);
+      box-shadow: 0 2rpx 16rpx rgba(226, 75, 74, 0.15);
     }
   }
 
