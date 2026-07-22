@@ -184,7 +184,7 @@ const periodLabel = computed(() => activePeriod.value === 'week' ? '本周' : '�
 const chartData = computed(() => {
   return summary.value.weeklyStats.length > 0
     ? summary.value.weeklyStats
-    : getRecentDates(7).map(date => ({ date, totalReminders: 0, completedCount: 0, delayedCount: 0, ignoredCount: 0, stoppedCount: 0, criticallyOverdueCount: 0, completionRate: 0 }));
+    : getRecentDates(7).map(date => ({ date, totalReminders: 0, completedCount: 0, delayedCount: 0, stoppedCount: 0, criticallyOverdueCount: 0, completionRate: 0 }));
 });
 
 onMounted(() => {

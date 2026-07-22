@@ -183,6 +183,7 @@ async function handleTimeline(userId, familyId, babyId) {
   // 构建操作人映射（用于显示谁完成了事项）
   const confirmByTask = {};
   const stoppedTaskIds = new Set();
+  const pausedTaskIds = new Set();
   confirmLogs.forEach((log) => {
     if (!confirmByTask[log.taskId]) {
       confirmByTask[log.taskId] = log;
@@ -190,6 +191,10 @@ async function handleTimeline(userId, familyId, babyId) {
     // 收集今日被停止的任务
     if (log.action === 'stopped') {
       stoppedTaskIds.add(log.taskId);
+    }
+    // 收集今日被暂停的任务
+    if (log.action === 'paused') {
+      pausedTaskIds.add(log.taskId);
     }
   });
 
@@ -251,8 +256,13 @@ async function handleTimeline(userId, familyId, babyId) {
     const isConfirmed = confirmedTaskIds.has(task._id);
 
     let status = 'pending';
-    // 优先使用 isOverdue 判定超时状态，向后兼容旧数据（nextRemindTime < now 也算超时）
-    if (task.isOverdue || remindTime.getTime() < now.getTime()) status = 'overdue';
+    // 暂停任务优先判断，暂停不标记超时
+    if (task.isPaused) {
+      status = 'paused';
+    } else if (task.isOverdue || remindTime.getTime() < now.getTime()) {
+      // 优先使用 isOverdue 判定超时状态，向后兼容旧数据（nextRemindTime < now 也算超时）
+      status = 'overdue';
+    }
     if (!isRecurring) {
        // 一次性任务: 只有完成了才算已完成；忽略/延迟/结束都不算
       const confirmAction = confirmByTask[task._id]?.action;
@@ -272,6 +282,9 @@ async function handleTimeline(userId, familyId, babyId) {
   for (const id of stoppedTaskIds) {
     if (!taskInTimelineIds.has(id)) supplementIds.add(id);
   }
+  for (const id of pausedTaskIds) {
+    if (!taskInTimelineIds.has(id)) supplementIds.add(id);
+  }
   if (supplementIds.size > 0) {
     const { data: supplementTasks } = await db.collection('reminder_tasks')
       .where({ _id: db.command.in(Array.from(supplementIds)) })
@@ -279,6 +292,8 @@ async function handleTimeline(userId, familyId, babyId) {
     supplementTasks.forEach((task) => {
       if (stoppedTaskIds.has(task._id)) {
         timeline.push(buildItem(task, { status: 'stopped' }));
+      } else if (pausedTaskIds.has(task._id)) {
+        timeline.push(buildItem(task, { status: 'paused', isRecurring: task.taskMode === 'recurring' }));
       } else {
         // 非暂停的补充任务，一定来自今日确认记录，状态为 completed
         timeline.push(buildItem(task, { status: 'completed', isRecurring: task.taskMode === 'recurring' }));

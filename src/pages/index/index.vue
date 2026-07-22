@@ -91,7 +91,7 @@
             </view>
             <view class="section-list slide-up-stagger">
               <TimelineItemComp v-for="item in pendingItems" :key="item.taskId" :item="item"
-                @complete="handleComplete" @delay="handleDelay" @ignore="handleIgnore"
+                @complete="handleComplete" @delay="handleDelay" @pause="handlePause" @restart="handleRestart"
                 @item-tap="goTaskDetail" />
             </view>
           </view>
@@ -107,7 +107,7 @@
             </view>
             <view class="section-list slide-up-stagger">
               <TimelineItemComp v-for="item in overdueItems" :key="item.taskId" :item="item"
-                @complete="handleComplete" @delay="handleDelay" @ignore="handleIgnore"
+                @complete="handleComplete" @delay="handleDelay" @pause="handlePause" @restart="handleRestart"
                 @item-tap="goTaskDetail" />
             </view>
           </view>
@@ -123,6 +123,22 @@
             </view>
             <view class="section-list slide-up-stagger">
               <TimelineItemComp v-for="item in completedItems" :key="item.taskId" :item="item"
+                @item-tap="goTaskDetail" />
+            </view>
+          </view>
+
+          <!-- 已暂停事项 -->
+          <view v-if="pausedItems.length > 0" class="section">
+            <view class="section-header">
+              <view class="section-title-wrap">
+                <view class="section-dot paused-dot" />
+                <text class="section-title">已暂停</text>
+              </view>
+              <u-tag :text="String(pausedItems.length)" type="primary" size="mini" shape="circle" plain />
+            </view>
+            <view class="section-list fade-in">
+              <TimelineItemComp v-for="item in pausedItems" :key="item.taskId" :item="item"
+                @complete="handleComplete" @stop="handleStop" @restart="handleRestart"
                 @item-tap="goTaskDetail" />
             </view>
           </view>
@@ -176,7 +192,7 @@ const babyStore = useBabyStore();
 const taskStore = useTaskStore();
 const userStore = useUserStore();
 const { currentBaby, hasBaby, currentBabyAge } = storeToRefs(babyStore);
-const { timeline, pendingItems, completedItems, overdueItems, stoppedItems } = storeToRefs(taskStore);
+const { timeline, pendingItems, completedItems, overdueItems, stoppedItems, pausedItems } = storeToRefs(taskStore);
 
 const statusBarHeight = ref(44);
 const refreshing = ref(false);
@@ -343,10 +359,15 @@ async function handleComplete(item: TimelineItem) {
 }
 
 async function handleDelay(item: TimelineItem) {
+  // 合并延迟和忽略：默认选项为跳过本次（以间隔时长延迟）
+  const intervalMinutes = item.intervalMinutes || 30;
+  const defaultLabel = `跳过本次（${intervalMinutes}分钟后提醒）`;
+  const delayOptions = [defaultLabel, '15分钟', '30分钟', '1小时', '2小时'];
   uni.showActionSheet({
-    itemList: ['延迟15分钟', '延迟30分钟', '延迟1小时', '延迟2小时'],
+    itemList: delayOptions,
     success: async (res) => {
-      const minutes = [15, 30, 60, 120][res.tapIndex];
+      // 第0项为默认（跳过本次=间隔时长），其余为固定延迟时长
+      const minutes = res.tapIndex === 0 ? intervalMinutes : [15, 30, 60, 120][res.tapIndex - 1];
       uni.showLoading({ title: '处理中...', mask: true });
       try {
         await taskStore.confirmTask({
@@ -369,12 +390,21 @@ async function handleDelay(item: TimelineItem) {
   });
 }
 
-async function handleIgnore(item: TimelineItem) {
+async function handlePause(item: TimelineItem) {
+  // 暂停确认弹框
+  const res = await uni.showModal({
+    title: '暂停提醒',
+    content: '暂停后，该事项将不会标记为超时或推送提醒，但你可以随时完成、延迟或重启它。',
+    confirmText: '确认暂停',
+    cancelText: '取消',
+  });
+  if (!res.confirm) return;
+
   uni.showLoading({ title: '处理中...', mask: true });
   try {
     await taskStore.confirmTask({
       taskId: item.taskId,
-      action: 'ignored',
+      action: 'paused',
       taskType: item.type,
       taskName: item.typeName,
       taskMode: item.taskMode,
@@ -382,7 +412,70 @@ async function handleIgnore(item: TimelineItem) {
     });
     loadData();
   } catch (e: any) {
-    console.error('[handleIgnore] 操作失败:', e);
+    console.error('[handlePause] 操作失败:', e);
+    uni.showToast({ title: '操作失败，请重试', icon: 'none' });
+  } finally {
+    uni.hideLoading();
+  }
+}
+
+async function handleRestart(item: TimelineItem) {
+  // 判断是否超时
+  const now = Date.now();
+  const remindTime = item.nextRemindTime ? new Date(item.nextRemindTime).getTime() : now;
+  const isOverdue = remindTime < now;
+
+  const confirmText = isOverdue ? '该事项已超时，重启后将进入下次提醒' : '该事项未超时，重启后将按原计划提醒';
+  const res = await uni.showModal({
+    title: '重启提醒',
+    content: confirmText + '\n确认重启吗？',
+    confirmText: '确认重启',
+    cancelText: '取消',
+  });
+  if (!res.confirm) return;
+
+  uni.showLoading({ title: '处理中...', mask: true });
+  try {
+    await taskStore.confirmTask({
+      taskId: item.taskId,
+      action: 'restart',
+      taskType: item.type,
+      taskName: item.typeName,
+      taskMode: item.taskMode,
+      completedCount: item.completedCount
+    });
+    loadData();
+  } catch (e: any) {
+    console.error('[handleRestart] 操作失败:', e);
+    uni.showToast({ title: '操作失败，请重试', icon: 'none' });
+  } finally {
+    uni.hideLoading();
+  }
+}
+
+async function handleStop(item: TimelineItem) {
+  const res = await uni.showModal({
+    title: '结束提醒',
+    content: '确认结束后，该事项将永久停用，不可恢复。',
+    confirmText: '确认结束',
+    cancelText: '取消',
+    confirmColor: '#FF7B7B',
+  });
+  if (!res.confirm) return;
+
+  uni.showLoading({ title: '处理中...', mask: true });
+  try {
+    await taskStore.confirmTask({
+      taskId: item.taskId,
+      action: 'stopped',
+      taskType: item.type,
+      taskName: item.typeName,
+      taskMode: item.taskMode,
+      completedCount: item.completedCount
+    });
+    loadData();
+  } catch (e: any) {
+    console.error('[handleStop] 操作失败:', e);
     uni.showToast({ title: '操作失败，请重试', icon: 'none' });
   } finally {
     uni.hideLoading();
@@ -639,6 +732,11 @@ async function handleIgnore(item: TimelineItem) {
         }
 
         &.stopped-dot {
+          background: #7f77dd;
+          box-shadow: 0 0 0 4rpx rgba(127, 119, 221, 0.15);
+        }
+
+        &.paused-dot {
           background: #7f77dd;
           box-shadow: 0 0 0 4rpx rgba(127, 119, 221, 0.15);
         }

@@ -87,19 +87,19 @@
           </view>
           <view class="action-text">
             <text class="action-name">稍后提醒</text>
-            <text class="action-desc">延迟 15/30/60/120 分钟</text>
+            <text class="action-desc">跳过本次或延迟提醒</text>
           </view>
           <u-icon name="arrow-right" :size="16" color="#ccc" />
         </view>
 
-        <!-- 忽略 -->
-        <view class="action-item tap-feedback" @tap="onIgnore">
-          <view class="action-icon-wrap ignore-bg">
-            <u-icon name="close-circle-fill" :size="28" color="#aaa" />
+        <!-- 暂停提醒 -->
+        <view class="action-item tap-feedback" @tap="onPauseRemind">
+          <view class="action-icon-wrap pause-bg">
+            <u-icon name="pause-circle-fill" :size="28" color="#7f77dd" />
           </view>
           <view class="action-text">
-            <text class="action-name">忽略本次</text>
-            <text class="action-desc">跳过本次提醒</text>
+            <text class="action-name">暂停提醒</text>
+            <text class="action-desc">暂停后不会标记超时和推送，可随时重启</text>
           </view>
           <u-icon name="arrow-right" :size="16" color="#ccc" />
         </view>
@@ -343,10 +343,15 @@ function getNextRemindTime(): string {
 
 function onDelay() {
   if (submitting.value) return;
+  // 合并延迟和忽略：默认选项为跳过本次（以间隔时长延迟）
+  const intervalMinutes = task.value?.intervalMinutes || 30;
+  const defaultLabel = `跳过本次（${intervalMinutes}分钟后提醒）`;
+  const delayOptions = [defaultLabel, '延迟 15 分钟', '延迟 30 分钟', '延迟 1 小时', '延迟 2 小时'];
   uni.showActionSheet({
-    itemList: ['延迟 15 分钟', '延迟 30 分钟', '延迟 1 小时', '延迟 2 小时'],
+    itemList: delayOptions,
     success: async (res) => {
-      const minutes = [15, 30, 60, 120][res.tapIndex];
+      // 第0项为默认（跳过本次=间隔时长），其余为固定延迟时长
+      const minutes = res.tapIndex === 0 ? intervalMinutes : [15, 30, 60, 120][res.tapIndex - 1];
       submitting.value = true;
       uni.showLoading({ title: '处理中...' });
       try {
@@ -371,12 +376,12 @@ function onDelay() {
   });
 }
 
-async function onIgnore() {
+async function onPauseRemind() {
   if (submitting.value) return;
   uni.showModal({
-    title: '确认忽略',
-    content: '忽略后本次提醒将不再推送，确定要忽略吗？',
-    confirmColor: '#FF7B7B',
+    title: '暂停提醒',
+    content: '暂停后，该事项将不会标记为超时或推送提醒，但你可以随时完成、延迟或重启它。',
+    confirmColor: '#7f77dd',
     success: async (res) => {
       if (res.confirm) {
         submitting.value = true;
@@ -384,7 +389,7 @@ async function onIgnore() {
         try {
           const ok = await taskStore.confirmTask({
             taskId: taskId.value,
-            action: 'ignored',
+            action: 'paused',
             taskType: task.value?.type,
             taskName: getTaskName(),
             taskMode: task.value?.taskMode,

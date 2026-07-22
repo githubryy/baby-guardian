@@ -197,8 +197,9 @@ function actionText(action: ConfirmAction): string {
   const map: Record<ConfirmAction, string> = {
     completed: '已完成',
     delayed: '已延迟',
-    ignored: '已忽略',
     stopped: '已停止',
+    paused: '已暂停',
+    restart: '待重启'
   };
   return map[action] || action;
 }
@@ -443,7 +444,6 @@ function resetFilter() {
 
         &.completed { background: #1d9e75; }
         &.delayed { background: #ef9f27; }
-        &.ignored { background: #ccc; }
       }
 
       .item-action {
@@ -451,7 +451,6 @@ function resetFilter() {
 
         &.completed { color: #1d9e75; }
         &.delayed { color: #ef9f27; }
-        &.ignored { color: #aaa; }
       }
 
       .operator-sep {

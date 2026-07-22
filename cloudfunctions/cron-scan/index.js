@@ -84,6 +84,7 @@ exports.main = async (event, context) => {
         enabled: true,
         nextRemindTime: _.lte(now.toISOString()),
         processingLock: false,
+        isPaused: _.neq(true), // 暂停的任务不处理
       })
       .orderBy("nextRemindTime", "asc")
       .limit(BATCH_LIMIT)

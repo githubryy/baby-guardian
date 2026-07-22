@@ -116,13 +116,22 @@ async function handleConfirm(userId, familyId, currentUser, data) {
         lockedAt: null,
       },
     });
-  } else if (action === 'ignored') {
-    // 忽略: 跳过本次，计算下次，清除显著超时标识
-    const nextRemind = new Date();
-    nextRemind.setMinutes(nextRemind.getMinutes() + task.intervalMinutes);
+  } else if (action === 'stopped') {
+    // 停止: 永久停用该事项，不可恢复，只能重新发起，清除显著超时标识
     await db.collection('reminder_tasks').doc(taskId).update({
       data: {
-        nextRemindTime: nextRemind.toISOString(),
+        enabled: false,
+        isOverdueCritically: false,
+        overdueDetectedAt: null,
+        processingLock: false,
+        lockedAt: null,
+      },
+    });
+  } else if (action === 'paused') {
+    // 暂停: 暂时暂停提醒，不可恢复被推送，但可以完成/延迟/重启，清除超时标识
+    await db.collection('reminder_tasks').doc(taskId).update({
+      data: {
+        isPaused: true,
         isOverdue: false,
         isOverdueCritically: false,
         overdueDetectedAt: null,
@@ -130,11 +139,25 @@ async function handleConfirm(userId, familyId, currentUser, data) {
         lockedAt: null,
       },
     });
-  } else if (action === 'stopped') {
-    // 停止: 永久停用该事项，不可恢复，只能重新发起，清除显著超时标识
+  } else if (action === 'restart') {
+    // 重启: 恢复暂停的事项
+    // 判断是否超时，超时则进入下次提醒周期，未超时则保持原计划
+    const nowDate = new Date();
+    const nextRemind = task.nextRemindTime ? new Date(task.nextRemindTime) : nowDate;
+    let newNextRemindTime;
+    if (nextRemind.getTime() < nowDate.getTime()) {
+      // 已超时：进入下次提醒周期（以当前时间 + intervalMinutes）
+      newNextRemindTime = new Date(nowDate.getTime());
+      newNextRemindTime.setMinutes(newNextRemindTime.getMinutes() + task.intervalMinutes);
+    } else {
+      // 未超时：保持原计划
+      newNextRemindTime = nextRemind;
+    }
     await db.collection('reminder_tasks').doc(taskId).update({
       data: {
-        enabled: false,
+        isPaused: false,
+        nextRemindTime: newNextRemindTime.toISOString(),
+        isOverdue: false,
         isOverdueCritically: false,
         overdueDetectedAt: null,
         processingLock: false,

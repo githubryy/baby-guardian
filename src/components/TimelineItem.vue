@@ -62,13 +62,13 @@
         </view>
 
         <!-- 指定负责人（家庭协作） -->
-        <view v-if="(item.status === 'pending' || item.status === 'overdue') && item.assigneeName" class="assignee-row">
+        <view v-if="(item.status === 'pending' || item.status === 'overdue' || item.status === 'paused') && item.assigneeName" class="assignee-row">
           <u-icon name="account-fill" :size="12" color="#ccc" />
           <text class="assignee-text">负责人：{{ item.assigneeName }}</text>
         </view>
       </view>
 
-      <!-- 操作按钮 -->
+      <!-- 操作按钮 - 待处理/超时状态 -->
       <view v-if="item.status === 'pending' || item.status === 'overdue'" class="card-actions">
         <view class="action-btn complete tap-feedback" @tap.stop="$emit('complete', item)">
           <u-icon name="checkmark-circle-fill" :size="16" color="#fff" />
@@ -78,10 +78,32 @@
           <u-icon name="clock-fill" :size="16" color="#d88e1a" />
           <text class="action-label">延迟</text>
         </view>
-        <view class="action-btn ignore tap-feedback" @tap.stop="$emit('ignore', item)">
-          <u-icon name="close-circle-fill" :size="16" color="#aaa" />
-          <text class="action-label">忽略</text>
+        <view class="action-btn pause tap-feedback" @tap.stop="$emit('pause', item)">
+          <u-icon name="pause-circle-fill" :size="16" color="#7f77dd" />
+          <text class="action-label">暂停</text>
         </view>
+      </view>
+
+      <!-- 操作按钮 - 暂停状态 -->
+      <view v-if="item.status === 'paused'" class="card-actions">
+        <view class="action-btn complete tap-feedback" @tap.stop="$emit('complete', item)">
+          <u-icon name="checkmark-circle-fill" :size="16" color="#fff" />
+          <text class="action-label">完成</text>
+        </view>
+        <view class="action-btn stop tap-feedback" @tap.stop="$emit('stop', item)">
+          <u-icon name="close-circle-fill" :size="16" color="#aaa" />
+          <text class="action-label">结束</text>
+        </view>
+        <view class="action-btn restart tap-feedback" @tap.stop="$emit('restart', item)">
+          <u-icon name="play-circle-fill" :size="16" color="#1d9e75" />
+          <text class="action-label">重启</text>
+        </view>
+      </view>
+
+      <!-- 暂停状态标识 -->
+      <view v-if="item.status === 'paused'" class="paused-info-row">
+        <u-icon name="pause-circle" :size="14" color="#7f77dd" />
+        <text class="paused-info-text">已暂停 · 可重启恢复提醒</text>
       </view>
     </view>
   </view>
@@ -101,7 +123,9 @@ defineEmits<{
   (e: 'item-tap', item: TimelineItem): void;
   (e: 'complete', item: TimelineItem): void;
   (e: 'delay', item: TimelineItem): void;
-  (e: 'ignore', item: TimelineItem): void;
+  (e: 'pause', item: TimelineItem): void;
+  (e: 'restart', item: TimelineItem): void;
+  (e: 'stop', item: TimelineItem): void;
 }>();
 
 const timeText = computed(() => {
@@ -155,6 +179,7 @@ const dotColor = computed(() => {
   if (props.item.status === 'completed') return '#1d9e75';
   if (props.item.status === 'delayed') return '#ef9f27';
   if (props.item.status === 'stopped') return '#7f77dd';
+  if (props.item.status === 'paused') return '#7f77dd';
   return safeTypeColor.value;
 });
 
@@ -407,6 +432,22 @@ function getRelationBg(relation?: FamilyRelation) {
         color: #ccc;
       }
     }
+
+    /* 暂停提示 */
+    .paused-info-row {
+      display: flex;
+      align-items: center;
+      gap: 6rpx;
+      margin-top: 12rpx;
+      padding: 10rpx 16rpx;
+      background: #f0eefb;
+      border-radius: 8rpx;
+
+      .paused-info-text {
+        font-size: 22rpx;
+        color: #7f77dd;
+      }
+    }
   }
 
   .card-actions {
@@ -446,7 +487,17 @@ function getRelationBg(relation?: FamilyRelation) {
         color: #d88e1a;
       }
 
-      &.ignore {
+      &.pause {
+        background: #f0eefb;
+        color: #7f77dd;
+      }
+
+      &.restart {
+        background: #e4f5ee;
+        color: #1d9e75;
+      }
+
+      &.stop {
         background: #f5f5f5;
         color: #aaa;
       }
@@ -480,6 +531,13 @@ function getRelationBg(relation?: FamilyRelation) {
     .content-card {
       border-left: 6rpx solid #7f77dd;
       opacity: 0.7;
+    }
+  }
+
+  &.paused {
+    .content-card {
+      border-left: 6rpx solid #7f77dd;
+      opacity: 0.85;
     }
   }
 }

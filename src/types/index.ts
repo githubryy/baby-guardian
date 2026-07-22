@@ -126,7 +126,7 @@ export interface ReminderTask {
 // ==================== 确认记录 ====================
 
 /** 确认操作类型 */
-export type ConfirmAction = 'completed' | 'delayed' | 'ignored' | 'stopped';
+export type ConfirmAction = 'completed' | 'delayed' | 'stopped' | 'paused' | 'restart';
 
 /** 确认日志表 */
 export interface ConfirmLog {
@@ -275,7 +275,6 @@ export interface DailyStat {
   totalReminders: number;
   completedCount: number;
   delayedCount: number;
-  ignoredCount: number;
   stoppedCount: number;
   criticallyOverdueCount: number;
   /** 完成率 */
@@ -327,8 +326,8 @@ export interface TimelineItem {
   typeColor: string;
   /** 距上次时长描述 */
   lastDurationText?: string;
-  /** 状态: pending=待处理, completed=已完成, delayed=已延迟, overdue=已超时, stopped=已停止(永久,不可恢复) */
-  status: 'pending' | 'completed' | 'delayed' | 'overdue' | 'stopped';
+  /** 状态: pending=待处理, completed=已完成, delayed=已延迟, overdue=已超时, stopped=已停止(永久,不可恢复), paused=已暂停(临时,可恢复) */
+  status: 'pending' | 'completed' | 'delayed' | 'overdue' | 'stopped' | 'paused';
   priority: TaskPriority;
   /** 完成者信息 */
   completedByName?: string;
