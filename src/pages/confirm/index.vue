@@ -46,8 +46,11 @@
             <text class="info-label">上次完成</text>
           </view>
           <view class="info-value operator-info">
-            <text class="operator-name-text" :style="{ color: getRelationColor(task?.lastCompletedByRelation) }">{{ lastCompletedByText }}</text>
-            <text class="operator-relation-tag" :style="{ color: getRelationColor(task?.lastCompletedByRelation), background: getRelationColor(task?.lastCompletedByRelation) + '15' }" v-if="task?.lastCompletedByRelation">{{ getRelationShortName(task.lastCompletedByRelation) }}</text>
+            <text class="operator-name-text" :style="{ color: getRelationColor(task?.lastCompletedByRelation) }">{{
+              lastCompletedByText }}</text>
+            <text class="operator-relation-tag"
+              :style="{ color: getRelationColor(task?.lastCompletedByRelation), background: getRelationColor(task?.lastCompletedByRelation) + '15' }"
+              v-if="task?.lastCompletedByRelation">{{ getRelationShortName(task.lastCompletedByRelation) }}</text>
           </view>
         </view>
       </view>
@@ -378,31 +381,22 @@ function onDelay() {
 
 async function onPauseRemind() {
   if (submitting.value) return;
-  uni.showModal({
-    title: '暂停提醒',
-    content: '暂停后，该事项将不会标记为超时或推送提醒，但你可以随时完成、结束或重启它。',
-    confirmColor: '#5b8def',
-    success: async (res) => {
-      if (res.confirm) {
-        submitting.value = true;
-        uni.showLoading({ title: '处理中...' });
-        try {
-          const ok = await taskStore.confirmTask({
-            taskId: taskId.value,
-            action: 'paused',
-            taskType: task.value?.type,
-            taskName: getTaskName(),
-            taskMode: task.value?.taskMode,
-            completedCount: task.value?.completedCount
-          });
-          if (ok) uni.navigateBack();
-        } finally {
-          submitting.value = false;
-          uni.hideLoading();
-        }
-      }
-    },
-  });
+  submitting.value = true;
+  uni.showLoading({ title: '处理中...' });
+  try {
+    const ok = await taskStore.confirmTask({
+      taskId: taskId.value,
+      action: 'paused',
+      taskType: task.value?.type,
+      taskName: getTaskName(),
+      taskMode: task.value?.taskMode,
+      completedCount: task.value?.completedCount
+    });
+    if (ok) uni.navigateBack();
+  } finally {
+    submitting.value = false;
+    uni.hideLoading();
+  }
 }
 
 async function onPause() {

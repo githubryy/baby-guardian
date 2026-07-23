@@ -200,7 +200,7 @@ function actionText(action: ConfirmAction): string {
     delayed: '已延迟',
     ended: '已结束',
     paused: '已暂停',
-    restart: '待重启'
+    restart: '已重启'
   };
   return map[action] || action;
 }

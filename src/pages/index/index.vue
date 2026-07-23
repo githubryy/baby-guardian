@@ -391,15 +391,6 @@ async function handleDelay(item: TimelineItem) {
 }
 
 async function handlePause(item: TimelineItem) {
-  // 暂停确认弹框
-  const res = await uni.showModal({
-    title: '暂停提醒',
-    content: '暂停后，该事项将不会标记为超时或推送提醒，但你可以随时完成、延迟或重启它。',
-    confirmText: '确认暂停',
-    cancelText: '取消',
-  });
-  if (!res.confirm) return;
-
   uni.showLoading({ title: '处理中...', mask: true });
   try {
     await taskStore.confirmTask({
@@ -423,21 +414,6 @@ async function handleRestart(item: TimelineItem) {
   // 在 tap 上下文中先发起订阅授权，避免 await 后丢失手势上下文
   const accepted = await guideBatchAuthorization('重启提醒后', item.type);
   if (accepted === 0) return; // 用户取消授权，不执行后续操作
-
-  // 判断是否超时
-  const now = Date.now();
-  const remindTime = item.nextRemindTime ? new Date(item.nextRemindTime).getTime() : now;
-  const isOverdue = remindTime < now;
-
-  const confirmText = isOverdue ? '该事项已超时，重启后将进入下次提醒' : '该事项未超时，重启后将按原计划提醒';
-  const res = await uni.showModal({
-    title: '重启提醒',
-    content: confirmText + '\n确认重启吗？',
-    confirmText: '确认重启',
-    cancelText: '取消',
-  });
-  if (!res.confirm) return;
-
   uni.showLoading({ title: '处理中...', mask: true });
   try {
     await taskStore.confirmTask({
