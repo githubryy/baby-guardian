@@ -1,6 +1,7 @@
 /**
  * api-stats 云函数
  * 统计查询: 概览、日统计、类型统计
+ * 设计：3 次主数据查询（reminder_tasks + overdue_events + confirm_logs），其余全部内存计算
  */
 const { cloud, db, _, success, fail, getOpenId } = require('./utils');
 
@@ -74,23 +75,18 @@ exports.main = async (event, context) => {
   }
 };
 
-/** 获取统计概览 */
+/**
+ * 获取统计概览
+ * 核心思路：只查 3 次数据库（reminder_tasks + overdue_events + confirm_logs），剩余全部内存计算
+ */
 async function handleSummary(userId, familyId, babyId) {
-  const now = new Date();
-  const today = dayBoundaries(now);
-
   // 宝宝数量
   const babyQuery = babyId
     ? _.or([{ familyId, _id: babyId }, { userId: familyId, _id: babyId }])
     : _.or([{ familyId }, { userId: familyId }]);
   const { total: totalBabies } = await db.collection('babies').where(babyQuery).count();
 
-  // 事项数量
-  const taskQuery = buildTaskQuery(familyId, babyId);
-  const { total: totalTasks } = await db.collection('reminder_tasks').where(taskQuery).count();
-  const { total: activeTasks } = await db.collection('reminder_tasks').where({ ...taskQuery, endedAt: _.exists(false) }).count();
-
-  // 最近 7 天日期
+  // 最近 7 天范围
   const dates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
@@ -99,64 +95,70 @@ async function handleSummary(userId, familyId, babyId) {
   const weekStart = dayBoundaries(dates[0]).start;
   const weekEnd = dayBoundaries(dates[6]).end;
 
-  // 一次查询整周 confirm_logs（同时提供今日总事件/完成/停止 + 周统计）
-  const { data: weekLogs } = await db.collection('confirm_logs')
-    .where({
-      familyId,
-      completedTime: _.gte(weekStart.toISOString()).and(_.lte(weekEnd.toISOString())),
+  // ============ 查询 1/3：reminder_tasks（全量字段一次性取出） ============
+  const taskQuery = buildTaskQuery(familyId, babyId);
+  const { data: allTasks } = await db.collection('reminder_tasks')
+    .where(taskQuery)
+    .field({
+      endedAt: true,
+      taskMode: true,
+      completedCount: true,
+      type: true,
     })
     .get();
 
-  // 今日总事件数 = confirm_logs 中今日所有记录（分母，口径与分子一致）
-  const todayReminders = weekLogs.filter(
-    (l) => l.completedTime >= today.start.toISOString()
-  ).length;
-
-  // 获取所有事项（用于 totalEvents 统计）
-  const { data: allTasks } = await db.collection('reminder_tasks')
-    .where(taskQuery)
-    .field({ endedAt: true, completedCount: true })
+  // ============ 查询 2/3：overdue_events（全量，用于总计 + 本周日统计） ============
+  const { data: allOverdueEvents } = await db.collection('overdue_events')
+    .where({ familyId })
+    .field({ occurredAt: true })
     .get();
 
-  // 今日已完成：从 confirm_logs 按日期过滤（completedCount 是累加值，无法按日拆分）
-  const todayCompleted = weekLogs.filter(
-    (l) => l.action === 'completed' && l.completedTime >= today.start.toISOString()
-  ).length;
-  const todayCompletionRate = calcRate(todayCompleted, todayReminders);
-
-  // 一次查询所有显著超时（替代原来的 total + weekly 两次查询）
-  // 注意：事项完成后 isOverdueCritically 会被重置为 false，但 overdueCriticallyCount 与 overdueTimeoutAt 仍保留，
-  // 因此按 overdueCriticallyCount > 0 统计，避免遗漏已完成的显著超时事件。
-  const { data: criticalTasks } = await db.collection('reminder_tasks')
-    .where({ ...taskQuery, overdueCriticallyCount: _.gt(0) })
+  // ============ 查询 3/3：confirm_logs（本周范围，用于周统计 + 类型统计） ============
+  const { data: weekLogs } = await db.collection('confirm_logs')
+    .where({
+      familyId,
+      createdAt: _.gte(weekStart.toISOString()).and(_.lte(weekEnd.toISOString())),
+    })
+    .field({ createdAt: true, action: true, taskId: true })
     .get();
-  const totalCriticallyOverdue = criticalTasks.reduce((sum, t) => sum + (t.overdueCriticallyCount || 0), 0);
-  const todayCriticallyOverdue = criticalTasks
-    .filter((t) => t.overdueTimeoutAt >= today.start.toISOString())
-    .reduce((sum, t) => sum + (t.overdueCriticallyCount || 0), 0);
 
-  // 结束事件：total 用 count 替代 get，today 从 weekLogs 提取
+  // ============ 内存计算：所有统计指标 ============
+
+  // ---- 事项基础统计 ----
+  // 总事件：
+  //   循环事件(taskMode=recurring): 已结束(endedAt有值) → completedCount, 未结束 → completedCount + 1
+  //   单次事件(taskMode=once): 算 1 次
+  const totalTasks = allTasks.reduce((sum, t) => {
+    if (t.taskMode === 'recurring') {
+      return sum + (t.completedCount || 0) + (!t.endedAt ? 1 : 0);
+    }
+    return sum + 1; // 单次事件
+  }, 0);
+  const activeTasks = allTasks.filter(t => !t.endedAt).length;
+
+  // ---- 已完成事件：reminder_tasks.completedCount 累加 ----
+  const totalCompleted = allTasks.reduce((sum, t) => sum + (t.completedCount || 0), 0);
+
+  // ---- 显著超时：overdue_events 全量记录数 ----
+  const totalCriticallyOverdue = allOverdueEvents.length;
+
+  // 筛选本周超时事件
+  const weekOverdueEvents = allOverdueEvents.filter(
+    e => e.occurredAt >= weekStart.toISOString() && e.occurredAt <= weekEnd.toISOString()
+  );
+
+  // ---- 结束事件：confirm_logs 中 action=ended 的总数 ----
+  // 需要全量统计（不限本周），用 count 查询（仅统计索引，极轻量）
   const { total: totalEnded } = await db.collection('confirm_logs')
     .where({ familyId, action: 'ended' })
     .count();
-  const todayEnded = weekLogs.filter(
-    (l) => l.action === 'ended' && l.completedTime >= today.start.toISOString()
-  ).length;
 
-  // 总完成事件
-  const { total: totalCompleted } = await db.collection('confirm_logs')
-    .where({ familyId, action: 'completed' })
-    .count();
-
-  // 事件总数 = 每个事项的 completedCount 之和 + 每个未结束事项 +1（当前待处理实例）
-  const totalEvents = allTasks.reduce((sum, t) => sum + (t.completedCount || 0) + (!t.endedAt ? 1 : 0), 0);
-
-  // 按日期分组 weekLogs
+  // ---- 周统计（按日期聚合 weekLogs + overdueEvents） ----
   const weekMap = {};
-  dates.forEach((d) => { weekMap[toDateStr(d)] = emptyDayStat(toDateStr(d)); });
+  dates.forEach(d => { weekMap[toDateStr(d)] = emptyDayStat(toDateStr(d)); });
 
-  weekLogs.forEach((l) => {
-    const dateKey = toDateStr(new Date(l.completedTime));
+  weekLogs.forEach(l => {
+    const dateKey = toDateStr(new Date(l.createdAt));
     if (weekMap[dateKey]) {
       weekMap[dateKey].totalReminders++;
       if (l.action === 'completed') weekMap[dateKey].completedCount++;
@@ -165,102 +167,122 @@ async function handleSummary(userId, familyId, babyId) {
     }
   });
 
-  // 从 criticalTasks 中内存过滤本周显著超时（不再单独查询）
-  criticalTasks.forEach((t) => {
-    if (t.overdueTimeoutAt >= weekStart.toISOString() && t.overdueTimeoutAt <= weekEnd.toISOString()) {
-      const dateKey = toDateStr(new Date(t.overdueTimeoutAt));
-      if (weekMap[dateKey]) weekMap[dateKey].criticallyOverdueCount++;
-    }
+  weekOverdueEvents.forEach(e => {
+    const dateKey = toDateStr(new Date(e.occurredAt));
+    if (weekMap[dateKey]) weekMap[dateKey].criticallyOverdueCount++;
   });
 
-  const weeklyStats = Object.values(weekMap).map((day) => ({
+  const weeklyStats = Object.values(weekMap).map(day => ({
     ...day,
     completionRate: calcRate(day.completedCount, day.totalReminders),
   }));
 
-  // 类型统计
-  const typeStats = await getTypeStats(familyId, weekStart.toISOString(), now.toISOString(), babyId);
+  // ---- 类型统计（内存计算：weekLogs + taskTypeMap） ----
+  const taskTypeMap = {};
+  allTasks.forEach(t => { taskTypeMap[t._id] = t.type; });
+
+  const typeCountMap = {};
+  weekLogs.forEach(l => {
+    const type = taskTypeMap[l.taskId] || 'custom';
+    typeCountMap[type] = (typeCountMap[type] || 0) + 1;
+  });
+
+  const typeTotal = Object.values(typeCountMap).reduce((a, b) => a + b, 0);
+  const typeStats = Object.entries(typeCountMap).map(([type, count]) => ({
+    type,
+    typeName: TASK_TYPE_NAMES[type] || '自定义',
+    count,
+    percentage: typeTotal > 0 ? Math.round((count / typeTotal) * 100) : 0,
+  }));
 
   return success({
     totalBabies, totalTasks, activeTasks,
-    todayReminders, todayCompleted, todayCompletionRate,
-    todayCriticallyOverdue, totalCriticallyOverdue,
-    todayEnded, totalEnded,
-    totalCompleted, totalEvents,
+    totalCriticallyOverdue, totalEnded,
+    totalCompleted,
     weeklyStats, typeStats,
   });
 }
 
-/** 日统计（按家庭查询） */
+/**
+ * 日统计（按家庭查询）
+ * 与 summary 同样的思路：2 次查询 + 内存计算
+ */
 async function handleDaily(userId, familyId, params) {
   const { babyId, startDate, endDate } = params;
   const range = dayBoundaries(new Date(startDate));
   range.end = dayBoundaries(new Date(endDate)).end;
 
-  const taskQuery = buildTaskQuery(familyId, babyId);
-
-  const query = { familyId, completedTime: _.gte(range.start.toISOString()).and(_.lte(range.end.toISOString())) };
+  // ---- 查询 1/2：confirm_logs（日期范围内） ----
+  const query = {
+    familyId,
+    createdAt: _.gte(range.start.toISOString()).and(_.lte(range.end.toISOString())),
+  };
   if (babyId) query.babyId = babyId;
-
-  const { data: logs } = await db.collection('confirm_logs').where(query).orderBy('completedTime', 'asc').get();
-
-  const { data: criticallyOverdueTasks } = await db.collection('reminder_tasks')
-    .where({
-      ...taskQuery,
-      overdueTimeoutAt: _.gte(range.start.toISOString()).and(_.lte(range.end.toISOString())),
-    })
+  const { data: logs } = await db.collection('confirm_logs')
+    .where(query)
+    .orderBy('createdAt', 'asc')
     .get();
 
+  // ---- 查询 2/2：overdue_events（显著超时事件，按日精确统计） ----
+  const { data: overdueEvents } = await db.collection('overdue_events')
+    .where({
+      familyId,
+      occurredAt: _.gte(range.start.toISOString()).and(_.lte(range.end.toISOString())),
+    })
+    .field({ occurredAt: true })
+    .get();
+
+  // ---- 内存计算 ----
   const dayMap = {};
   const ensureDay = (dateStr) => {
     if (!dayMap[dateStr]) dayMap[dateStr] = emptyDayStat(dateStr);
     return dayMap[dateStr];
   };
 
-  logs.forEach((l) => {
-    const day = ensureDay(toDateStr(new Date(l.completedTime)));
+  logs.forEach(l => {
+    const day = ensureDay(toDateStr(new Date(l.createdAt)));
     day.totalReminders++;
     if (l.action === 'completed') day.completedCount++;
     else if (l.action === 'delayed') day.delayedCount++;
     else if (l.action === 'ended') day.endedCount++;
   });
 
-  criticallyOverdueTasks.forEach((t) => {
-    const day = ensureDay(toDateStr(new Date(t.overdueTimeoutAt || t.createdAt)));
-    day.criticallyOverdueCount += t.overdueCriticallyCount || 1;
+  overdueEvents.forEach(e => {
+    const day = ensureDay(toDateStr(new Date(e.occurredAt)));
+    day.criticallyOverdueCount++;
   });
 
-  Object.values(dayMap).forEach((d) => { d.completionRate = calcRate(d.completedCount, d.totalReminders); });
+  Object.values(dayMap).forEach(d => { d.completionRate = calcRate(d.completedCount, d.totalReminders); });
 
   return success(Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date)));
 }
 
-/** 类型统计 */
+/**
+ * 类型统计（仅用于独立 byType 调用）
+ */
 async function getTypeStats(familyId, startDate, endDate, babyId) {
-  const query = { familyId, completedTime: _.gte(startDate).and(_.lte(endDate)) };
+  const query = { familyId, createdAt: _.gte(startDate).and(_.lte(endDate)) };
   if (babyId) query.babyId = babyId;
 
   const { data: logs } = await db.collection('confirm_logs').where(query).get();
 
-  // 批量获取关联事项类型
-  const taskIds = [...new Set(logs.map((l) => l.taskId))];
+  const taskIds = [...new Set(logs.map(l => l.taskId))];
   const taskTypeMap = {};
   if (taskIds.length > 0) {
-    // 微信云开发 _.in 单次最多 100 条
     const chunks = [];
     for (let i = 0; i < taskIds.length; i += 100) {
       chunks.push(taskIds.slice(i, i + 100));
     }
-    const results = await Promise.all(chunks.map((ids) =>
-      db.collection('reminder_tasks').where({ _id: _.in(ids) }).get()
+    const results = await Promise.all(chunks.map(ids =>
+      db.collection('reminder_tasks').where({ _id: _.in(ids) }).field({ type: true }).get()
     ));
     results.forEach(({ data }) => {
-      data.forEach((t) => { taskTypeMap[t._id] = t.type; });
+      data.forEach(t => { taskTypeMap[t._id] = t.type; });
     });
   }
 
   const typeCountMap = {};
-  logs.forEach((l) => {
+  logs.forEach(l => {
     const type = taskTypeMap[l.taskId] || 'custom';
     typeCountMap[type] = (typeCountMap[type] || 0) + 1;
   });

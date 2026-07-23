@@ -57,7 +57,7 @@
         <view class="group-items slide-up-stagger">
           <view v-for="item in group.items" :key="item._id" class="history-item">
             <view class="item-time">
-              <text class="time">{{ formatTime(item.completedTime) }}</text>
+              <text class="time">{{ formatTime(item.createdAt) }}</text>
             </view>
             <view class="item-icon" :style="{ background: getTypeConfig(item).bgColor }">
               <u-icon :name="getTypeConfig(item).icon" :size="22" :color="getTypeConfig(item).color" />
@@ -164,7 +164,7 @@ const groupedHistory = computed(() => {
   const groupMap: Record<string, ConfirmLog[]> = {};
 
   historyList.value.forEach((item) => {
-    const date = formatDate(item.completedTime);
+    const date = formatDate(item.createdAt);
     if (!groupMap[date]) {
       groupMap[date] = [];
     }

@@ -104,7 +104,7 @@ async function handleAdd(userId, familyId, data) {
     processingLock: false,
     lockedAt: null,
     isOverdue: false,
-    completedCount: data.taskMode === 'recurring' ? 0 : null,
+    completedCount: 0,
     createdAt: nowIso,
   };
 
@@ -178,9 +178,9 @@ async function handleTimeline(userId, familyId, babyId) {
   const { data: confirmLogs } = await db.collection('confirm_logs')
     .where({
       familyId,
-      completedTime: _.gte(todayStart.toISOString()),
+      createdAt: _.gte(todayStart.toISOString()),
     })
-    .orderBy('completedTime', 'desc')
+    .orderBy('createdAt', 'desc')
     .get();
 
   // 构建操作人映射（用于显示谁完成了事项）
@@ -241,12 +241,12 @@ async function handleTimeline(userId, familyId, babyId) {
       completedByName: confirmLog?.operatorName || null,
       completedByAvatar: confirmLog?.operatorAvatar || null,
       completedByRelation: confirmLog?.operatorRelation || null,
-      completedAt: confirmLog?.completedTime || null,
+      completedAt: confirmLog?.createdAt || null,
       assigneeName: assignee?.nickName || null,
       assigneeAvatar: assignee?.avatarUrl || null,
       taskMode: task.taskMode || null,
       repeatCount: task.repeatCount ?? null,
-      completedCount: task.completedCount ?? null,
+      completedCount: task.completedCount ?? 0,
       intervalMinutes: task.intervalMinutes ?? null,
       nextRemindTime: task.nextRemindTime || task.createdAt,
       nextRemindRemaining: isRecurring ? getRemainingText(task.nextRemindTime) : null,

@@ -146,8 +146,8 @@ export interface ConfirmLog {
   /** 事项名称（自定义类型时为 customName，否则为内置名称，旧数据可能缺失） */
   taskName?: string;
   action: ConfirmAction;
-  /** 实际完成时间 */
-  completedTime: string;
+  /** 记录创建时间 */
+  createdAt: string;
   /** 延迟分钟数 (action=delayed 时) */
   delayMinutes?: number;
   /** 备注 */
@@ -166,7 +166,6 @@ export interface ConfirmLog {
   completedCount?: number;
   /** 是否显著超时（来自事项标记，旧数据可能缺失） */
   isOverdueCritically?: boolean;
-  createdAt: string;
 }
 
 // ==================== 订阅配额 ====================
@@ -303,19 +302,12 @@ export interface StatsSummary {
   totalBabies: number;
   totalTasks: number;
   activeTasks: number;
-  todayReminders: number;
-  todayCompleted: number;
-  todayCompletionRate: number;
-  /** 显著超时事件数 */
-  todayCriticallyOverdue: number;
+  /** 显著超时事件总数 */
   totalCriticallyOverdue: number;
-  /** 结束事件数 */
-  todayEnded: number;
+  /** 结束事件总数 */
   totalEnded: number;
   /** 已完成事件总数 */
   totalCompleted: number;
-  /** 总事件数（已完成+暂停+显著超时） */
-  totalEvents: number;
   weeklyStats: DailyStat[];
   typeStats: TypeStat[];
 }

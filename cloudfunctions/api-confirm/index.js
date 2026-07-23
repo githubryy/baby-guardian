@@ -54,7 +54,6 @@ async function handleConfirm(userId, familyId, currentUser, data) {
     taskType: taskType || task.type || 'custom',
     taskName: taskName || task.customName || '未命名',
     action,
-    completedTime: now,
     delayMinutes: delayMinutes || null,
     remark: remark || null,
     // 操作人信息
@@ -81,6 +80,7 @@ async function handleConfirm(userId, familyId, currentUser, data) {
       lastCompletedByName: currentUser.nickName,
       lastCompletedByRelation: currentUser.relation || 'other',
       isOverdue: false,
+      isPaused: false,
       isOverdueCritically: false,
       overdueDetectedAt: null,
       processingLock: false,
@@ -114,6 +114,7 @@ async function handleConfirm(userId, familyId, currentUser, data) {
         nextRemindTime: baseTime.toISOString(),
         isOverdue: false,
         isOverdueCritically: false,
+        isPaused: false,
         overdueDetectedAt: null,
         processingLock: false,
         lockedAt: null,
@@ -124,7 +125,9 @@ async function handleConfirm(userId, familyId, currentUser, data) {
     await db.collection('reminder_tasks').doc(taskId).update({
       data: {
         endedAt: now,
+        isOverdue: false,
         isOverdueCritically: false,
+        isPaused: false,
         overdueDetectedAt: null,
         processingLock: false,
         lockedAt: null,
@@ -181,12 +184,12 @@ async function handleHistory(userId, familyId, params = {}) {
   if (taskId) query.taskId = taskId;
   if (taskType) query.taskType = taskType;
   if (startDate || endDate) {
-    query.completedTime = {};
+    query.createdAt = {};
     const start = startDate ? `${startDate}T00:00:00.000Z` : null;
     const end = endDate ? `${endDate}T23:59:59.999Z` : null;
-    if (start) query.completedTime = _.gte(start);
+    if (start) query.createdAt = _.gte(start);
     if (end) {
-      query.completedTime = start
+      query.createdAt = start
         ? _.gte(start).and(_.lte(end))
         : _.lte(end);
     }
@@ -198,7 +201,7 @@ async function handleHistory(userId, familyId, params = {}) {
 
   const { data: list } = await db.collection('confirm_logs')
     .where(query)
-    .orderBy('completedTime', 'desc')
+    .orderBy('createdAt', 'desc')
     .skip((page - 1) * pageSize)
     .limit(pageSize)
     .get();

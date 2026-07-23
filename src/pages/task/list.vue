@@ -71,6 +71,7 @@ const filteredList = computed(() => {
 });
 
 function onEditTask(task: ReminderTask) {
+  if (task.endedAt) return;
   uni.navigateTo({ url: `/pages/task/edit?id=${task._id}` });
 }
 

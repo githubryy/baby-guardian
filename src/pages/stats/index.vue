@@ -13,7 +13,7 @@
       <view class="card-title">
         <u-icon name="calendar-fill" :size="18" color="#FF7B7B" />
         <text>事件统计概览</text>
-        <text class="title-hint">今日 / 总计</text>
+        <text class="title-hint">{{ periodLabel }} / 总计</text>
       </view>
       <view class="event-grid">
         <!-- 显著超时事件 -->
@@ -22,7 +22,7 @@
             <u-icon name="error-circle-fill" :size="28" color="#fff" />
           </view>
           <view class="ec-body">
-            <text class="ec-num critical">{{ summary.todayCriticallyOverdue }}</text>
+            <text class="ec-num critical">{{ periodStats.criticallyOverdue }}</text>
             <text class="ec-total">总计 {{ summary.totalCriticallyOverdue }}</text>
             <text class="ec-label">显著超时事件</text>
           </view>
@@ -33,9 +33,9 @@
             <u-icon name="pause-circle-fill" :size="28" color="#fff" />
           </view>
           <view class="ec-body">
-            <text class="ec-num ended">{{ summary.todayEnded }}</text>
+            <text class="ec-num ended">{{ periodStats.ended }}</text>
             <text class="ec-total">总计 {{ summary.totalEnded }}</text>
-            <text class="ec-label">结束事件</text>
+            <text class="ec-label">主动结束事件</text>
           </view>
         </view>
         <!-- 已完成事件 -->
@@ -44,8 +44,8 @@
             <u-icon name="checkmark-circle-fill" :size="28" color="#fff" />
           </view>
           <view class="ec-body">
-            <text class="ec-num completed">{{ summary.todayCompleted }}</text>
-            <text class="ec-total">总计 {{ summary.totalCompleted ?? summary.todayCompleted }}</text>
+            <text class="ec-num completed">{{ periodStats.completed }}</text>
+            <text class="ec-total">总计 {{ summary.totalCompleted }}</text>
             <text class="ec-label">已完成事件</text>
           </view>
         </view>
@@ -55,8 +55,8 @@
             <u-icon name="grid-fill" :size="28" color="#fff" />
           </view>
           <view class="ec-body">
-            <text class="ec-num total">{{ summary.totalEvents }}</text>
-            <text class="ec-total">今日完成 {{ summary.todayCompletionRate }}%</text>
+            <text class="ec-num total">{{ periodStats.totalEvents }}</text>
+            <text class="ec-total">{{ periodLabel }}完成率 {{ periodStats.completionRate }}%</text>
             <text class="ec-label">总事件统计</text>
           </view>
         </view>
@@ -141,13 +141,13 @@
     </view>
 
     <!-- 空状态 -->
-    <EmptyState v-if="!loading && summary.todayReminders === 0 && summary.totalTasks === 0"
+    <EmptyState v-if="!loading && periodStats.totalEvents === 0 && summary.totalTasks === 0"
       uIcon="calendar-fill" text="暂无统计数据" subText="添加提醒事项后即可查看统计" />
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
 import { getStatsSummary, getDailyStats } from '@/api/stats';
 import { TASK_TYPE_CONFIG } from '@/utils/constants';
@@ -161,15 +161,9 @@ const summary = ref<StatsSummary>({
   totalBabies: 0,
   totalTasks: 0,
   activeTasks: 0,
-  todayReminders: 0,
-  todayCompleted: 0,
-  todayCompletionRate: 0,
-  todayCriticallyOverdue: 0,
   totalCriticallyOverdue: 0,
-  todayEnded: 0,
   totalEnded: 0,
   totalCompleted: 0,
-  totalEvents: 0,
   weeklyStats: [],
   typeStats: [],
 });
@@ -180,6 +174,11 @@ const periodTabs = [
 ];
 
 const periodLabel = computed(() => activePeriod.value === 'week' ? '本周' : '本月');
+
+// 切换周期时重新加载
+watch(activePeriod, () => {
+  loadData();
+});
 
 const chartData = computed(() => {
   return summary.value.weeklyStats.length > 0
@@ -193,6 +192,19 @@ onMounted(() => {
 
 onShow(() => {
   loadData();
+});
+
+// 根据当前周期聚合 dailyData
+const periodStats = computed(() => {
+  const stats = summary.value.weeklyStats;
+  if (stats.length === 0) return { completed: 0, ended: 0, criticallyOverdue: 0, totalEvents: 0, completionRate: 0 };
+  return {
+    completed: stats.reduce((sum, s) => sum + (s.completedCount || 0), 0),
+    ended: stats.reduce((sum, s) => sum + (s.endedCount || 0), 0),
+    criticallyOverdue: stats.reduce((sum, s) => sum + (s.criticallyOverdueCount || 0), 0),
+    totalEvents: stats.reduce((sum, s) => sum + (s.completedCount || 0) + (s.endedCount || 0), 0),
+    completionRate: Math.round(stats.reduce((sum, s) => sum + (s.completionRate || 0), 0) / stats.length),
+  };
 });
 
 async function loadData() {

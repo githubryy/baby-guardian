@@ -156,6 +156,14 @@ exports.main = async (event, context) => {
                 overdueCriticallyCount: _.inc(1),
               },
             });
+            // 记录显著超时事件，用于统计按日精确计数
+            await db.collection("overdue_events").add({
+              data: {
+                taskId: task._id,
+                familyId: task.familyId,
+                occurredAt: now.toISOString(),
+              },
+            });
             return;
           }
 

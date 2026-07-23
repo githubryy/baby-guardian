@@ -1,5 +1,5 @@
 <template>
-  <view class="task-item tap-shrink" :class="{ disabled: task.endedAt, critical: isCritical }" @tap="$emit('itemTap', task)">
+  <view class="task-item tap-shrink" :class="{ disabled: task.endedAt, critical: isCritical }" @tap="onItemTap">
     <view class="type-icon" :style="{ background: typeConfig.bgColor }">
       <u-icon :name="typeConfig.icon" :size="30" :color="typeConfig.color" />
     </view>
@@ -26,7 +26,7 @@
       </view>
     </view>
     <view class="switch-wrap" @tap.stop>
-      <u-switch v-model="enabledProxy" activeColor="#FF7B7B" size="20" />
+      <u-switch v-model="enabledProxy" activeColor="#FF7B7B" size="20" :disabled="!!task.endedAt" />
     </view>
   </view>
 </template>
@@ -69,6 +69,11 @@ const nextRemindText = computed(() => {
   if (props.task.endedAt) return '已结束';
   return relativeTime(props.task.nextRemindTime);
 });
+
+function onItemTap() {
+  if (props.task.endedAt) return;
+  emit('itemTap', props.task);
+}
 </script>
 
 <style lang="scss" scoped>
