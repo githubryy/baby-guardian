@@ -1,0 +1,55 @@
+/* ========== 锁定亮色模式：忽略系统夜间模式 ========== */
+/* 因为应用使用场景主要在白天，强制所有 uview-plus CSS 变量保持亮色值 */
+/* 引入时机：必须在 uview-plus/index.scss 之后引入，通过层叠覆盖暗色变量 */
+@media (prefers-color-scheme: dark) {
+  :root,
+  page,
+  body {
+    --up-main-color: #303133;
+    --up-content-color: #606266;
+    --up-tips-color: #909193;
+    --up-light-color: #c0c4cc;
+    --up-border-color: #dadbde;
+    --up-bg-color: #f3f4f6;
+    --up-hover-bg-color: #e7ebf0;
+    --up-page-bg-color: #f3f4f6;
+    --up-card-bg-color: #ffffff;
+    --up-navbar-bg-color: #ffffff;
+    --up-disabled-color: #c8c9cc;
+
+    --up-primary: #3c9cff;
+    --up-primary-dark: #398ade;
+    --up-primary-disabled: #9acafc;
+    --up-primary-light: #ecf5ff;
+
+    --up-warning: #f9ae3d;
+    --up-warning-dark: #f1a532;
+    --up-warning-disabled: #f9d39b;
+    --up-warning-light: #fdf6ec;
+
+    --up-success: #5ac725;
+    --up-success-dark: #53c21d;
+    --up-success-disabled: #a9e08f;
+    --up-success-light: #f5fff0;
+
+    --up-error: #f56c6c;
+    --up-error-dark: #e45656;
+    --up-error-disabled: #f7b2b2;
+    --up-error-light: #fef0f0;
+
+    --up-info: #909399;
+    --up-info-dark: #767a82;
+    --up-info-disabled: #c4c6c9;
+    --up-info-light: #f4f4f5;
+
+    --up-table2-header-bg-color: #f5f7fa;
+    --up-table2-zebra-bg-color: #fafafa;
+    --up-table2-highlight-bg-color: #f5f7fa;
+    --up-gap-bg-color: #f3f4f6;
+    --up-skeleton-bg-color: #f1f2f4;
+    --up-skeleton-shimmer-color: #e6e6e6;
+    --up-swipe-action-button-bg-color: #c7c6cd;
+    --up-index-list-indicator-bg-color: #c9c9c9;
+    --up-calendar-month-mark-color: rgba(231, 232, 234, 0.83);
+  }
+}

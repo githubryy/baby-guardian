@@ -68,6 +68,9 @@ onHide(() => {
 /* uview-plus 基础样式 */
 @import "uview-plus/index.scss";
 
+/* 锁定亮色模式 */
+@import "@/styles/theme-lock.scss";
+
 /* 全局样式重置 */
 page {
   background-color: #f8f8f8;
@@ -75,7 +78,7 @@ page {
   font-size: 28rpx;
   color: #2d2d2d;
   line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
+  -webkit-font-scheme: antialiased;
 }
 
 /* 去除按钮默认样式 */

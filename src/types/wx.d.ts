@@ -5,6 +5,10 @@
 declare const wx: {
   [x: string]: any;
   cloud: {
+    init(options: {
+      env: string;
+      traceUser?: boolean;
+    }): void;
     callFunction(options: {
       name: string;
       data?: Record<string, any>;

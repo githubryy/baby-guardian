@@ -10,5 +10,3 @@ declare module '*.vue' {
 interface Uni {
   $appReady?: import('vue').Ref<boolean>;
 }
-
-
