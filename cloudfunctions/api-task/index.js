@@ -275,7 +275,9 @@ async function handleTimeline(userId, familyId, babyId) {
   tasks.forEach((task) => {
     const remindTime = new Date(task.nextRemindTime);
     const isRecurring = task.taskMode === 'recurring';
-    const isConfirmed = confirmedTaskIds.has(task._id);
+
+    // 今日确认记录优先: 只要今天点过完成，就显示为已完成
+    const todayConfirmAction = confirmByTask[task._id]?.action;
 
     let status = 'pending';
     // 暂停任务优先判断，暂停不标记超时
@@ -285,11 +287,12 @@ async function handleTimeline(userId, familyId, babyId) {
       // 优先使用 isOverdue 判定超时状态，向后兼容旧数据（nextRemindTime < now 也算超时）
       status = 'overdue';
     }
-    if (!isRecurring) {
-       // 一次性任务: 只有完成了才算已完成；忽略/延迟/结束都不算
-      const confirmAction = confirmByTask[task._id]?.action;
-      const isDone = confirmAction === 'completed';
-      if (isDone || task.lastCompletedTime) status = 'completed';
+    // 完成状态: 今日确认记录优先，覆盖暂停/超时/待处理
+    if (todayConfirmAction === 'completed') {
+      status = 'completed';
+    } else if (!isRecurring && task.lastCompletedTime) {
+      // 一次性任务没有今日确认记录时的兜底
+      status = 'completed';
     }
 
     timeline.push(buildItem(task, { status, isRecurring }));
