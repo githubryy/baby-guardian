@@ -379,6 +379,7 @@ async function sendSubscriptionMessage(task, familyQuota, members) {
     const result = await cloud.openapi.subscribeMessage.send({
       touser: familyQuota.openId,
       templateId,
+      page: "pages/index/index",
       data: sendData,
       miniprogramState: getMiniProgramState(),
       lang: "zh_CN",
