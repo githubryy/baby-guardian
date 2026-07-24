@@ -2,8 +2,13 @@
   <view class="page-stats page-enter">
     <!-- 日期选择 -->
     <view class="period-tabs">
-      <view v-for="tab in periodTabs" :key="tab.value" class="tab-item tap-shrink"
-        :class="{ active: activePeriod === tab.value }" @tap="activePeriod = tab.value">
+      <view
+        v-for="tab in periodTabs"
+        :key="tab.value"
+        class="tab-item tap-shrink"
+        :class="{ active: activePeriod === tab.value }"
+        @tap="activePeriod = tab.value"
+      >
         <text>{{ tab.label }}</text>
       </view>
     </view>
@@ -18,18 +23,28 @@
       <view class="event-grid">
         <!-- 显著超时事件 -->
         <view class="event-card critical">
-          <view class="ec-icon-box" style="background: linear-gradient(135deg, #ee6a69, #e24b4a)">
+          <view
+            class="ec-icon-box"
+            style="background: linear-gradient(135deg, #ee6a69, #e24b4a)"
+          >
             <u-icon name="error-circle-fill" :size="28" color="#fff" />
           </view>
           <view class="ec-body">
-            <text class="ec-num critical">{{ periodStats.criticallyOverdue }}</text>
-            <text class="ec-total">总计 {{ summary.totalCriticallyOverdue }}</text>
+            <text class="ec-num critical">{{
+              periodStats.criticallyOverdue
+            }}</text>
+            <text class="ec-total"
+              >总计 {{ summary.totalCriticallyOverdue }}</text
+            >
             <text class="ec-label">显著超时事件</text>
           </view>
         </view>
         <!-- 结束事件 -->
         <view class="event-card ended">
-          <view class="ec-icon-box" style="background: linear-gradient(135deg, #f5b547, #ef9f27)">
+          <view
+            class="ec-icon-box"
+            style="background: linear-gradient(135deg, #f5b547, #ef9f27)"
+          >
             <u-icon name="pause-circle-fill" :size="28" color="#fff" />
           </view>
           <view class="ec-body">
@@ -40,7 +55,10 @@
         </view>
         <!-- 已完成事件 -->
         <view class="event-card completed">
-          <view class="ec-icon-box" style="background: linear-gradient(135deg, #28b886, #1d9e75)">
+          <view
+            class="ec-icon-box"
+            style="background: linear-gradient(135deg, #28b886, #1d9e75)"
+          >
             <u-icon name="checkmark-circle-fill" :size="28" color="#fff" />
           </view>
           <view class="ec-body">
@@ -51,12 +69,17 @@
         </view>
         <!-- 总事件统计 -->
         <view class="event-card total">
-          <view class="ec-icon-box" style="background: linear-gradient(135deg, #5b7fff, #3d5bdb)">
+          <view
+            class="ec-icon-box"
+            style="background: linear-gradient(135deg, #5b7fff, #3d5bdb)"
+          >
             <u-icon name="grid-fill" :size="28" color="#fff" />
           </view>
           <view class="ec-body">
             <text class="ec-num total">{{ periodStats.totalEvents }}</text>
-            <text class="ec-total">{{ periodLabel }}完成率 {{ periodStats.completionRate }}%</text>
+            <text class="ec-total"
+              >{{ periodLabel }}完成率 {{ periodStats.completionRate }}%</text
+            >
             <text class="ec-label">总事件统计</text>
           </view>
         </view>
@@ -76,9 +99,32 @@
           <!-- 堆叠柱 -->
           <view class="bar-track">
             <view class="bar-stack-wrap">
-              <view class="bar-fill-comp" :style="{ height: getStackHeight(stat.completedCount, stat) + '%', background: 'linear-gradient(180deg, #28b886, #1d9e75)', animationDelay: index * 0.05 + 's' }" />
-              <view class="bar-fill-comp" :style="{ height: getStackHeight(stat.endedCount || 0, stat) + '%', background: 'linear-gradient(180deg, #f5b547, #ef9f27)', animationDelay: (index * 0.05 + 0.1) + 's' }" />
-              <view class="bar-fill-comp" :style="{ height: getStackHeight(stat.criticallyOverdueCount || 0, stat) + '%', background: 'linear-gradient(180deg, #ee6a69, #e24b4a)', animationDelay: (index * 0.05 + 0.2) + 's' }" />
+              <view
+                class="bar-fill-comp"
+                :style="{
+                  height: getStackHeight(stat.completedCount, stat) + '%',
+                  background: 'linear-gradient(180deg, #28b886, #1d9e75)',
+                  animationDelay: index * 0.05 + 's',
+                }"
+              />
+              <view
+                class="bar-fill-comp"
+                :style="{
+                  height: getStackHeight(stat.endedCount || 0, stat) + '%',
+                  background: 'linear-gradient(180deg, #f5b547, #ef9f27)',
+                  animationDelay: index * 0.05 + 0.1 + 's',
+                }"
+              />
+              <view
+                class="bar-fill-comp"
+                :style="{
+                  height:
+                    getStackHeight(stat.criticallyOverdueCount || 0, stat) +
+                    '%',
+                  background: 'linear-gradient(180deg, #ee6a69, #e24b4a)',
+                  animationDelay: index * 0.05 + 0.2 + 's',
+                }"
+              />
             </view>
           </view>
           <text class="bar-label">{{ stat.date.slice(5) }}</text>
@@ -86,31 +132,55 @@
       </view>
       <!-- 图例 -->
       <view class="chart-legend">
-        <view class="legend-item"><view class="legend-dot comp" /><text>已完成</text></view>
-        <view class="legend-item"><view class="legend-dot pause" /><text>暂停</text></view>
-        <view class="legend-item"><view class="legend-dot crit" /><text>显著超时</text></view>
+        <view class="legend-item">
+          <view class="legend-dot comp" /><text>已完成</text>
+        </view>
+        <view class="legend-item">
+          <view class="legend-dot pause" /><text>暂停</text>
+        </view>
+        <view class="legend-item">
+          <view class="legend-dot crit" /><text>显著超时</text>
+        </view>
       </view>
     </view>
 
     <!-- 事项类型分布 -->
-    <view v-if="summary.typeStats.length > 0" class="type-card slide-up" style="animation-delay: 0.15s">
+    <view
+      v-if="summary.typeStats.length > 0"
+      class="type-card slide-up"
+      style="animation-delay: 0.15s"
+    >
       <view class="card-title">
         <u-icon name="grid-fill" :size="18" color="#FF7B7B" />
         <text>事项类型分布</text>
       </view>
       <view class="type-list">
-        <view v-for="item in summary.typeStats" :key="item.type" class="type-row">
+        <view
+          v-for="item in summary.typeStats"
+          :key="item.type"
+          class="type-row"
+        >
           <view class="type-info">
-            <view class="type-icon-box" :style="{ background: getTaskColor(item.type) + '18' }">
-              <u-icon :name="getTaskUIcon(item.type as TaskType)" :size="18" :color="getTaskColor(item.type as TaskType)" />
+            <view
+              class="type-icon-box"
+              :style="{ background: getTaskColor(item.type) + '18' }"
+            >
+              <u-icon
+                :name="getTaskUIcon(item.type as TaskType)"
+                :size="18"
+                :color="getTaskColor(item.type as TaskType)"
+              />
             </view>
             <text class="type-name">{{ item.typeName }}</text>
           </view>
           <view class="type-bar-wrap">
-            <view class="type-bar" :style="{
-              width: item.percentage + '%',
-              background: getTaskColor(item.type as TaskType)
-            }" />
+            <view
+              class="type-bar"
+              :style="{
+                width: item.percentage + '%',
+                background: getTaskColor(item.type as TaskType),
+              }"
+            />
           </view>
           <text class="type-count">{{ item.count }}次</text>
           <text class="type-percent">{{ item.percentage }}%</text>
@@ -141,8 +211,14 @@
     </view>
 
     <!-- 空状态 -->
-    <EmptyState v-if="!loading && periodStats.totalEvents === 0 && summary.totalTasks === 0"
-      uIcon="calendar-fill" text="暂无统计数据" subText="添加提醒事项后即可查看统计" />
+    <EmptyState
+      v-if="
+        !loading && periodStats.totalEvents === 0 && summary.totalTasks === 0
+      "
+      uIcon="calendar-fill"
+      text="暂无统计数据"
+      subText="添加提醒事项后即可查看统计"
+    />
   </view>
 
   <!-- 浮动添加按钮 -->
@@ -150,15 +226,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
-import { onShow } from '@dcloudio/uni-app';
-import { getStatsSummary, getDailyStats } from '@/api/stats';
-import { TASK_TYPE_CONFIG } from '@/utils/constants';
-import { getRecentDates } from '@/utils/time';
-import type { StatsSummary, TaskType } from '@/types';
-import EmptyState from '@/components/EmptyState.vue';
+import { ref, computed, watch, onMounted } from "vue";
+import { onShow } from "@dcloudio/uni-app";
+import { getStatsSummary, getDailyStats } from "@/api/stats";
+import { TASK_TYPE_CONFIG } from "@/utils/constants";
+import { getRecentDates } from "@/utils/time";
+import type { StatsSummary, TaskType } from "@/types";
+import EmptyState from "@/components/EmptyState.vue";
 
-const activePeriod = ref<'week' | 'month'>('week');
+const activePeriod = ref<"week" | "month">("week");
 const loading = ref(false);
 const summary = ref<StatsSummary>({
   totalBabies: 0,
@@ -172,11 +248,13 @@ const summary = ref<StatsSummary>({
 });
 
 const periodTabs = [
-  { label: '本周', value: 'week' as const },
-  { label: '本月', value: 'month' as const },
+  { label: "本周", value: "week" as const },
+  { label: "本月", value: "month" as const },
 ];
 
-const periodLabel = computed(() => activePeriod.value === 'week' ? '本周' : '本月');
+const periodLabel = computed(() =>
+  activePeriod.value === "week" ? "本周" : "本月",
+);
 
 // 切换周期时重新加载
 watch(activePeriod, () => {
@@ -186,7 +264,14 @@ watch(activePeriod, () => {
 const chartData = computed(() => {
   return summary.value.weeklyStats.length > 0
     ? summary.value.weeklyStats
-    : getRecentDates(7).map(date => ({ date, totalReminders: 0, completedCount: 0, endedCount: 0, criticallyOverdueCount: 0, completionRate: 0 }));
+    : getRecentDates(7).map((date) => ({
+        date,
+        totalReminders: 0,
+        completedCount: 0,
+        endedCount: 0,
+        criticallyOverdueCount: 0,
+        completionRate: 0,
+      }));
 });
 
 onMounted(() => {
@@ -200,20 +285,38 @@ onShow(() => {
 // 根据当前周期聚合 dailyData
 const periodStats = computed(() => {
   const stats = summary.value.weeklyStats;
-  if (stats.length === 0) return { completed: 0, ended: 0, criticallyOverdue: 0, totalEvents: 0, completionRate: 0 };
+  if (stats.length === 0)
+    return {
+      completed: 0,
+      ended: 0,
+      criticallyOverdue: 0,
+      totalEvents: 0,
+      completionRate: 0,
+    };
   return {
     completed: stats.reduce((sum, s) => sum + (s.completedCount || 0), 0),
     ended: stats.reduce((sum, s) => sum + (s.endedCount || 0), 0),
-    criticallyOverdue: stats.reduce((sum, s) => sum + (s.criticallyOverdueCount || 0), 0),
-    totalEvents: stats.reduce((sum, s) => sum + (s.criticallyOverdueCount || 0) + (s.completedCount || 0) + (s.endedCount || 0), 0),
-    completionRate: Math.round(stats.reduce((sum, s) => sum + (s.completionRate || 0), 0) / stats.length),
+    criticallyOverdue: stats.reduce(
+      (sum, s) => sum + (s.criticallyOverdueCount || 0),
+      0,
+    ),
+    totalEvents: stats.reduce((sum, s) => {
+      const curCount =
+        (s.completedCount || (s.criticallyOverdueCount ? 1 : 0)) +
+        (s.endedCount || 0);
+      return sum + (curCount > s.totalReminders ? curCount : s.totalReminders);
+    }, 0),
+    completionRate: Math.round(
+      stats.reduce((sum, s) => sum + (s.completionRate || 0), 0) / stats.length,
+    ),
   };
 });
 
 async function loadData() {
   loading.value = true;
   try {
-    const dates = activePeriod.value === 'week' ? getRecentDates(7) : getRecentDates(30);
+    const dates =
+      activePeriod.value === "week" ? getRecentDates(7) : getRecentDates(30);
     const [summaryData, dailyData] = await Promise.all([
       getStatsSummary(),
       getDailyStats({ startDate: dates[0], endDate: dates[dates.length - 1] }),
@@ -221,7 +324,7 @@ async function loadData() {
     summary.value = summaryData;
     summary.value.weeklyStats = dailyData;
   } catch (err) {
-    console.error('[加载统计数据失败]', err);
+    console.error("[加载统计数据失败]", err);
   } finally {
     loading.value = false;
   }
@@ -240,15 +343,19 @@ function getStackHeight(count: number, stat: Record<string, any>): number {
 }
 
 function totalForDay(stat: Record<string, any>): number {
-  return (Number(stat.completedCount) || 0) + (Number(stat.endedCount) || 0) + (Number(stat.criticallyOverdueCount) || 0);
+  return (
+    (Number(stat.completedCount) || 0) +
+    (Number(stat.endedCount) || 0) +
+    (Number(stat.criticallyOverdueCount) || 0)
+  );
 }
 
 function getTaskUIcon(type: TaskType): string {
-  return TASK_TYPE_CONFIG[type]?.uIcon || 'edit-pen';
+  return TASK_TYPE_CONFIG[type]?.uIcon || "edit-pen";
 }
 
 function getTaskColor(type: TaskType | string): string {
-  return TASK_TYPE_CONFIG[type as TaskType]?.color || '#999';
+  return TASK_TYPE_CONFIG[type as TaskType]?.color || "#999";
 }
 </script>
 
@@ -322,7 +429,9 @@ function getTaskColor(type: TaskType | string): string {
       display: flex;
       align-items: center;
       gap: 16rpx;
-      transition: transform 0.2s, box-shadow 0.2s;
+      transition:
+        transform 0.2s,
+        box-shadow 0.2s;
 
       &:active {
         transform: scale(0.97);
@@ -344,16 +453,28 @@ function getTaskColor(type: TaskType | string): string {
         flex-direction: column;
         min-width: 0;
         text-align: center;
+
         .ec-num {
           font-size: 40rpx;
           font-weight: 700;
           font-variant-numeric: tabular-nums;
           line-height: 1.1;
 
-          &.critical { color: #e24b4a; }
-          &.ended { color: #ef9f27; }
-          &.completed { color: #1d9e75; }
-          &.total { color: #5b7fff; }
+          &.critical {
+            color: #e24b4a;
+          }
+
+          &.ended {
+            color: #ef9f27;
+          }
+
+          &.completed {
+            color: #1d9e75;
+          }
+
+          &.total {
+            color: #5b7fff;
+          }
         }
 
         .ec-total {
@@ -463,9 +584,17 @@ function getTaskColor(type: TaskType | string): string {
         height: 14rpx;
         border-radius: 4rpx;
 
-        &.comp { background: #1d9e75; }
-        &.pause { background: #ef9f27; }
-        &.crit { background: #e24b4a; }
+        &.comp {
+          background: #1d9e75;
+        }
+
+        &.pause {
+          background: #ef9f27;
+        }
+
+        &.crit {
+          background: #e24b4a;
+        }
       }
     }
   }

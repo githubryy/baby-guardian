@@ -166,7 +166,7 @@ async function onJoin() {
     display: flex;
     flex-wrap: wrap;
     gap: 20rpx;
-
+    justify-content: center;
     .relation-option {
       width: calc((100% - 40rpx) / 3);
       display: flex;
