@@ -114,6 +114,20 @@ async function handleAdd(userId, familyId, data) {
 
 /** 更新事项 */
 async function handleUpdate(taskId, data) {
+  // 如果 intervalMinutes 变更且事项未超时，以当前时间为基准重新计算下次提醒时间
+  if (data.intervalMinutes !== undefined) {
+    const { data: task } = await db.collection('reminder_tasks')
+      .doc(taskId)
+      .field({ intervalMinutes: true, nextRemindTime: true })
+      .get();
+    if (task && task.intervalMinutes !== data.intervalMinutes && task.nextRemindTime) {
+      const prevNext = new Date(task.nextRemindTime);
+      if (!isNaN(prevNext.getTime()) && prevNext.getTime() > Date.now()) {
+        data.nextRemindTime = new Date(Date.now() + data.intervalMinutes * 60 * 1000).toISOString();
+      }
+    }
+  }
+
   const updateData = { ...data, updatedAt: nowISO() };
   delete updateData._id;
   delete updateData.userId;

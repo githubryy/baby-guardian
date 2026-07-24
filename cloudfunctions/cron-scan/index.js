@@ -60,6 +60,7 @@ const TYPE_TEMPLATE_MAP = {
   sleep: "care",
   vitamin: "medicine",
   medicine: "medicine",
+  custom: "care",
 };
 
 exports.main = async (event, context) => {
@@ -203,18 +204,21 @@ exports.main = async (event, context) => {
           return;
         }
 
-        // 4d. 获取家庭所有成员的配额
+        // 4d. 获取家庭所有成员的配额，若指定了完成人则只推送该成员
         const { quotas: familyQuotas, members } = await getFamilyQuotas(task);
-        if (familyQuotas.length === 0) {
-          console.log(`[cron-scan] 事项 ${task._id} 家庭配额不足`);
+        const targetQuotas = task.assigneeId
+          ? familyQuotas.filter((q) => q.user._id === task.assigneeId)
+          : familyQuotas;
+        if (targetQuotas.length === 0) {
+          console.log(`[cron-scan] 事项 ${task._id}${task.assigneeId ? ' 指定完成人' : ''} 配额不足`);
           quotaExhausted++;
           await logNotification(task, null, "quota_exhausted", null, 0);
           // 不修改任务状态，让其自然进入超时，用户在时间线中仍能看到
           return;
         }
-        // 4e. 向有配额的家庭成员发送订阅消息
+        // 4e. 向目标成员发送订阅消息
         let anySuccess = false;
-        for (const fq of familyQuotas) {
+        for (const fq of targetQuotas) {
           const sendResult = await sendSubscriptionMessage(task, fq, members);
           await logNotification(
             task,
@@ -302,10 +306,16 @@ async function unlockStaleTasks(now) {
  */
 async function getFamilyQuotas(task) {
   const templateKey = TYPE_TEMPLATE_MAP[task.type];
-  if (!templateKey) return [];
+  if (!templateKey) {
+    console.log(`[cron-scan] 事项 ${task._id} 类型 ${task.type} 无模板映射，跳过推送`);
+    return { quotas: [], members: [] };
+  }
 
   const templateId = TEMPLATES[templateKey];
-  if (!templateId) return [];
+  if (!templateId) {
+    console.log(`[cron-scan] 事项 ${task._id} 模板Key ${templateKey} 无对应模板ID，跳过推送`);
+    return { quotas: [], members: [] };
+  }
 
   // 获取家庭信息
   const familyId = task.familyId || task.userId;
@@ -429,7 +439,7 @@ function buildMessageData(task, baby, templateKey, assigneeName) {
   const priorityName = priorityNames[task.priority] || "普通";
 
   // 是否循环
-  const recurringTag = (task.taskMode === "recurring" || task.intervalMinutes) ? "循环" : "单次";
+  const recurringTag = task.taskMode === "recurring" ? "循环" : "单次";
 
   // 适配模板 thing 字段 20 字符限制
   // 一行展示：宝宝名 + 类型 + 优先级 + 循环标识 + 执行人

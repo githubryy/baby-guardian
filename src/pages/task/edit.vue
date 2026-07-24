@@ -140,10 +140,13 @@
         </view>
         <view class="custom-interval">
           <text class="interval-label">自定义</text>
-          <u-input v-model="customIntervalStr" type="number" placeholder="分钟" border="surround"
-            :customStyle="{ flex: '1', textAlign: 'center' }" @confirm="applyCustomInterval" />
+          <picker mode="selector" :range="customIntervalRange" :value="customIntervalIndex" @change="onCustomIntervalChange">
+            <view class="interval-picker">
+              <text class="interval-value">{{ customIntervalLabel }}</text>
+              <u-icon name="arrow-down" :size="12" color="#999" />
+            </view>
+          </picker>
           <text class="interval-unit">分钟</text>
-          <u-button class="custom-style" text="应用" size="mini" type="error" @click="applyCustomInterval" />
         </view>
       </view>
 
@@ -220,7 +223,6 @@ const familyStore = useFamilyStore();
 
 const isEdit = ref(false);
 const editId = ref('');
-const customIntervalStr = ref('');
 const saving = ref(false);
 
 const form = ref({
@@ -243,8 +245,7 @@ const intervalPresets = [
   { label: '3小时', value: 180 },
   { label: '4小时', value: 240 },
   { label: '6小时', value: 360 },
-  { label: '8小时', value: 480 },
-  { label: '每天', value: 1440 },
+  { label: '8小时', value: 480 }
 ];
 
 const priorityHint = computed(() => {
@@ -347,7 +348,6 @@ async function loadTaskDetail() {
       repeatCount: task.repeatCount ?? -1,
       assigneeId: task.assigneeId || '',
     };
-    !intervalPresets.some((p) => p.value === task.intervalMinutes) && (customIntervalStr.value = String(task.intervalMinutes))
     uni.setNavigationBarTitle({ title: '编辑事项' });
   }
 }
@@ -361,12 +361,28 @@ function onSelectType(type: TaskType) {
   form.value.type = type;
 }
 
-function applyCustomInterval() {
-  const val = Number(customIntervalStr.value);
-  if (val && val > 0) {
-    form.value.intervalMinutes = val;
-    uni.showToast({ title: '已设置', icon: 'none' });
-  }
+// 自定义间隔滚动选择器
+const customIntervalOptions = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90, 100, 110, 120, 150, 180, 210, 240, 300, 360, 420, 480, 600, 720, 900, 1080, 1440];
+
+const customIntervalRange = computed(() => customIntervalOptions.map((v) => {
+  if (v < 60) return `${v}分钟`;
+  if (v % 60 === 0) return `${v / 60}小时`;
+  return `${Math.floor(v / 60)}小时${v % 60}分钟`;
+}));
+
+const customIntervalIndex = computed(() => {
+  const idx = customIntervalOptions.indexOf(form.value.intervalMinutes);
+  return idx >= 0 ? idx : 0;
+});
+
+const customIntervalLabel = computed(() =>
+  form.value.intervalMinutes < 60
+    ? `${form.value.intervalMinutes}分钟`
+    : `${Math.floor(form.value.intervalMinutes / 60)}小时${form.value.intervalMinutes % 60 || ''}`
+);
+
+function onCustomIntervalChange(e: { detail: { value: number } }) {
+  form.value.intervalMinutes = customIntervalOptions[e.detail.value];
 }
 
 async function onSave() {
@@ -723,21 +739,41 @@ async function onDelete() {
 }
 
 .custom-interval {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr 2fr;
+  display: flex;
   align-items: center;
   gap: 15px;
   background: #f9f9f9;
   border-radius: 12rpx;
+  padding: 15rpx 20rpx;
 
   .interval-label {
     font-size: 26rpx;
     color: #999;
+    flex-shrink: 0;
+  }
+
+  .interval-picker {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8rpx;
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 8rpx;
+    padding: 12rpx 16rpx;
+
+    .interval-value {
+      font-size: 28rpx;
+      color: #333;
+      font-weight: 500;
+    }
   }
 
   .interval-unit {
     font-size: 24rpx;
     color: #999;
+    flex-shrink: 0;
   }
 }
 
