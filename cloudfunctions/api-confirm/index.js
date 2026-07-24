@@ -39,13 +39,21 @@ exports.main = async (event, context) => {
 async function handleConfirm(userId, familyId, currentUser, data) {
   const { taskId, action, delayMinutes, remark, taskType, taskName } = data;
   const now = nowISO();
-  // 获取事项
-  const { data: task } = await db.collection('reminder_tasks').doc(taskId).get();
+
+  // 获取事项（仅取必要字段，减少数据传输）
+  const { data: task } = await db.collection('reminder_tasks')
+    .doc(taskId)
+    .field({
+      babyId: true, taskMode: true, intervalMinutes: true,
+      repeatCount: true, completedCount: true, nextRemindTime: true,
+      isOverdueCritically: true, type: true, customName: true,
+    })
+    .get();
   if (!task) return fail('事项不存在');
 
   const completedCount = action === 'completed' ? ((task.completedCount || 0) + 1) : task.completedCount;
 
-  // 写入确认日志（含操作人信息 + 事项类型/名称，由前端传入）
+  // 构建确认日志
   const log = {
     taskId,
     babyId: task.babyId,
@@ -56,25 +64,20 @@ async function handleConfirm(userId, familyId, currentUser, data) {
     action,
     delayMinutes: delayMinutes || null,
     remark: remark || null,
-    // 操作人信息
     operatorId: userId,
     operatorName: currentUser.nickName || '家庭成员',
     operatorAvatar: currentUser.avatarUrl || '',
     operatorRelation: currentUser.relation || 'other',
-    // 循环事件标识
     taskMode: task.taskMode || 'once',
-    // 循环事件：延迟/忽略时也保留当前的 completedCount
     completedCount,
-    // 记录事项是否显著超时
     isOverdueCritically: task.isOverdueCritically || false,
     createdAt: now,
   };
-  const { _id: logId } = await db.collection('confirm_logs').add({ data: log });
 
-  // 更新事项状态
+  // 计算任务更新数据（先组装好，再与日志并行写入）
+  let updateData;
   if (action === 'completed') {
-    // 完成: 记录完成者信息，重置超时状态，清除显著超时标识
-    const updateData = {
+    updateData = {
       lastCompletedTime: now,
       lastCompletedBy: userId,
       lastCompletedByName: currentUser.nickName,
@@ -85,94 +88,65 @@ async function handleConfirm(userId, familyId, currentUser, data) {
       overdueDetectedAt: null,
       processingLock: false,
       lockedAt: null,
-      completedCount
+      completedCount,
     };
     if (task.taskMode === 'recurring') {
-      // 循环事件: 计算下次提醒时间 + 递增 completedCount
       const nextRemind = new Date();
       nextRemind.setMinutes(nextRemind.getMinutes() + task.intervalMinutes);
       updateData.nextRemindTime = nextRemind.toISOString();
-      // 有限循环且已完成全部次数 → 自动结束
       if (task.repeatCount > 0 && updateData.completedCount >= task.repeatCount) {
         updateData.endedAt = now;
       }
     } else {
-      // 一次性任务完成 → 自动结束
       updateData.endedAt = now;
     }
-    // 一次性任务: 不更新 nextRemindTime（已完成无需再次提醒）
-    await db.collection('reminder_tasks').doc(taskId).update({ data: updateData });
   } else if (action === 'delayed') {
-    // 延迟: 从 nextRemindTime 和 now 中取较晚者，再增加 delayMinutes
-    // 避免已超时任务延迟后时间仍在过去，也防止叠加跨天导致前端消失
     const nowDate = new Date();
     const nextRemind = task.nextRemindTime ? new Date(task.nextRemindTime) : nowDate;
     const baseTime = nextRemind.getTime() < nowDate.getTime() ? nowDate : nextRemind;
     baseTime.setMinutes(baseTime.getMinutes() + (delayMinutes || 15));
-    await db.collection('reminder_tasks').doc(taskId).update({
-      data: {
-        nextRemindTime: baseTime.toISOString(),
-        isOverdue: false,
-        isOverdueCritically: false,
-        isPaused: false,
-        overdueDetectedAt: null,
-        processingLock: false,
-        lockedAt: null,
-      },
-    });
+    updateData = {
+      nextRemindTime: baseTime.toISOString(),
+      isOverdue: false, isOverdueCritically: false, isPaused: false,
+      overdueDetectedAt: null, processingLock: false, lockedAt: null,
+    };
   } else if (action === 'ended') {
-    // 结束该事项，不可恢复，只能重新发起，清除显著超时标识
-    await db.collection('reminder_tasks').doc(taskId).update({
-      data: {
-        endedAt: now,
-        isOverdue: false,
-        isOverdueCritically: false,
-        isPaused: false,
-        overdueDetectedAt: null,
-        processingLock: false,
-        lockedAt: null,
-      },
-    });
+    updateData = {
+      endedAt: now,
+      isOverdue: false, isOverdueCritically: false, isPaused: false,
+      overdueDetectedAt: null, processingLock: false, lockedAt: null,
+    };
   } else if (action === 'paused') {
-    // 暂停: 暂时暂停提醒，不可恢复被推送，但可以完成/延迟/重启，清除超时标识
-    await db.collection('reminder_tasks').doc(taskId).update({
-      data: {
-        isPaused: true,
-        isOverdue: false,
-        isOverdueCritically: false,
-        overdueDetectedAt: null,
-        processingLock: false,
-        lockedAt: null,
-      },
-    });
+    updateData = {
+      isPaused: true,
+      isOverdue: false, isOverdueCritically: false,
+      overdueDetectedAt: null, processingLock: false, lockedAt: null,
+    };
   } else if (action === 'restart') {
-    // 重启: 恢复暂停的事项
-    // 判断是否超时，超时则进入下次提醒周期，未超时则保持原计划
     const nowDate = new Date();
     const nextRemind = task.nextRemindTime ? new Date(task.nextRemindTime) : nowDate;
     let newNextRemindTime;
     if (nextRemind.getTime() < nowDate.getTime()) {
-      // 已超时：进入下次提醒周期（以当前时间 + intervalMinutes）
       newNextRemindTime = new Date(nowDate.getTime());
       newNextRemindTime.setMinutes(newNextRemindTime.getMinutes() + task.intervalMinutes);
     } else {
-      // 未超时：保持原计划
       newNextRemindTime = nextRemind;
     }
-    await db.collection('reminder_tasks').doc(taskId).update({
-      data: {
-        isPaused: false,
-        nextRemindTime: newNextRemindTime.toISOString(),
-        isOverdue: false,
-        isOverdueCritically: false,
-        overdueDetectedAt: null,
-        processingLock: false,
-        lockedAt: null,
-      },
-    });
+    updateData = {
+      isPaused: false,
+      nextRemindTime: newNextRemindTime.toISOString(),
+      isOverdue: false, isOverdueCritically: false,
+      overdueDetectedAt: null, processingLock: false, lockedAt: null,
+    };
   }
 
-  return success({ ...log, _id: logId });
+  // 并行写入：日志 + 任务更新（无依赖关系）
+  const [logRes] = await Promise.all([
+    db.collection('confirm_logs').add({ data: log }),
+    db.collection('reminder_tasks').doc(taskId).update({ data: updateData }),
+  ]);
+
+  return success({ ...log, _id: logRes._id });
 }
 
 /** 获取确认历史（按家庭查询） */
@@ -184,27 +158,32 @@ async function handleHistory(userId, familyId, params = {}) {
   if (taskId) query.taskId = taskId;
   if (taskType) query.taskType = taskType;
   if (startDate || endDate) {
-    query.createdAt = {};
     const start = startDate ? `${startDate}T00:00:00.000Z` : null;
     const end = endDate ? `${endDate}T23:59:59.999Z` : null;
-    if (start) query.createdAt = _.gte(start);
-    if (end) {
-      query.createdAt = start
-        ? _.gte(start).and(_.lte(end))
-        : _.lte(end);
+    if (start && end) {
+      query.createdAt = _.gte(start).and(_.lte(end));
+    } else if (start) {
+      query.createdAt = _.gte(start);
+    } else {
+      query.createdAt = _.lte(end);
     }
   }
 
-  const { total } = await db.collection('confirm_logs')
-    .where(query)
-    .count();
+  // 并行执行 count + 列表查询，只取前端需要的字段
+  const [countRes, listRes] = await Promise.all([
+    db.collection('confirm_logs').where(query).count(),
+    db.collection('confirm_logs')
+      .where(query)
+      .orderBy('createdAt', 'desc')
+      .skip((page - 1) * pageSize)
+      .limit(pageSize)
+      .field({
+        taskId: true, babyId: true, action: true, taskType: true,
+        taskName: true, operatorName: true, operatorAvatar: true,
+        operatorRelation: true, delayMinutes: true, remark: true, createdAt: true,
+      })
+      .get(),
+  ]);
 
-  const { data: list } = await db.collection('confirm_logs')
-    .where(query)
-    .orderBy('createdAt', 'desc')
-    .skip((page - 1) * pageSize)
-    .limit(pageSize)
-    .get();
-
-  return success({ list, total, page, pageSize });
+  return success({ list: listRes.data, total: countRes.total, page, pageSize });
 }

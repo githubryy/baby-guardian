@@ -60,9 +60,11 @@ async function handleLogin(openId) {
         data: { updatedAt: nowISO() },
       });
   } else {
-    // 创建新用户
+    // 创建新用户（手动指定 _id 避免两次写操作）
     const now = nowISO();
+    const _id = `u_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const newUser = {
+      _id,
       openId,
       nickName: "宝爸/宝妈",
       avatarUrl: "",
@@ -71,17 +73,12 @@ async function handleLogin(openId) {
         quietHoursStart: "22:00",
         quietHoursEnd: "07:00",
       },
-      familyId: "",
+      familyId: _id,
       createdAt: now,
       updatedAt: now,
     };
-    const { _id } = await db.collection("users").add({ data: newUser });
-    // familyId 默认等于自身用户ID
-    await db
-      .collection("users")
-      .doc(_id)
-      .update({ data: { familyId: _id } });
-    user = { ...newUser, _id, familyId: _id };
+    await db.collection("users").add({ data: newUser });
+    user = newUser;
   }
 
   return success(user);
@@ -190,52 +187,41 @@ async function handleRecordQuota(openId, templates) {
 async function handleGetQuotaSummary(openId) {
   const now = nowISO();
 
-  // 标记过期配额
+  // 1. 标记过期配额
   await db
     .collection("subscription_quotas")
     .where({ openId, status: "available", expireAt: _.lt(now) })
     .update({ data: { status: "expired" } });
 
-  // 统计
-  const { total: totalCount } = await db
+  // 2. 一次查询拉取全部配额（仅取必要字段），改为内存聚合
+  const { data: allQuotas } = await db
     .collection("subscription_quotas")
     .where({ openId })
-    .count();
-
-  const { total: availableCount } = await db
-    .collection("subscription_quotas")
-    .where({ openId, status: "available" })
-    .count();
-
-  const { total: consumedCount } = await db
-    .collection("subscription_quotas")
-    .where({ openId, status: "consumed" })
-    .count();
-
-  const { total: expiredCount } = await db
-    .collection("subscription_quotas")
-    .where({ openId, status: "expired" })
-    .count();
-
-  // 按模板分类
-  const byTemplate = { feeding: 0, care: 0, medicine: 0 };
-  const { data: availableList } = await db
-    .collection("subscription_quotas")
-    .where({ openId, status: "available" })
+    .field({ status: true, templateKey: true })
     .get();
 
-  availableList.forEach((q) => {
-    const key = q.templateKey || "feeding";
-    if (byTemplate[key] !== undefined) {
-      byTemplate[key]++;
+  let available = 0;
+  let consumed = 0;
+  let expired = 0;
+  const byTemplate = { feeding: 0, care: 0, medicine: 0 };
+
+  for (const q of allQuotas) {
+    if (q.status === "available") {
+      available++;
+      const key = q.templateKey || "feeding";
+      if (byTemplate[key] !== undefined) byTemplate[key]++;
+    } else if (q.status === "consumed") {
+      consumed++;
+    } else if (q.status === "expired") {
+      expired++;
     }
-  });
+  }
 
   return success({
-    total: totalCount,
-    available: availableCount,
-    consumed: consumedCount,
-    expired: expiredCount,
+    total: allQuotas.length,
+    available,
+    consumed,
+    expired,
     byTemplate,
   });
 }

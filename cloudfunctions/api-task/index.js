@@ -152,36 +152,49 @@ async function handleTimeline(userId, familyId, babyId) {
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date(now);
   todayEnd.setHours(23, 59, 59, 999);
+  const todayEndISO = todayEnd.toISOString();
+  const todayStartISO = todayStart.toISOString();
 
-  // 获取家庭内所有宝宝
+  // 并行执行 4 个独立查询
   const babyQuery = babyId
     ? _.or([{ familyId, _id: babyId }, { userId: familyId, _id: babyId }])
     : _.or([{ familyId }, { userId: familyId }]);
-  const { data: babies } = await db.collection('babies')
-    .where(babyQuery)
-    .get();
+
+  const [babiesRes, tasksRes, confirmLogsRes, familyRes] = await Promise.all([
+    db.collection('babies')
+      .where(babyQuery)
+      .field({ _id: true, name: true, avatarUrl: true })
+      .get(),
+    db.collection('reminder_tasks')
+      .where({
+        familyId,
+        endedAt: _.exists(false),
+        nextRemindTime: _.lte(todayEndISO),
+      })
+      .orderBy('nextRemindTime', 'desc')
+      .get(),
+    db.collection('confirm_logs')
+      .where({
+        familyId,
+        createdAt: _.gte(todayStartISO),
+      })
+      .field({ taskId: true, action: true, createdAt: true, operatorName: true, operatorAvatar: true, operatorRelation: true })
+      .orderBy('createdAt', 'desc')
+      .get(),
+    db.collection('families')
+      .doc(familyId)
+      .field({ members: true })
+      .get()
+      .catch(() => ({ data: null })),
+  ]);
+
+  const { data: babies } = babiesRes;
+  const { data: tasks } = tasksRes;
+  const { data: confirmLogs } = confirmLogsRes;
+  const { data: family } = familyRes;
 
   const babyMap = {};
   babies.forEach((b) => { babyMap[b._id] = b; });
-
-  // 获取今日所有事项的提醒（按家庭查询，倒序：最新时间在前）
-  const { data: tasks } = await db.collection('reminder_tasks')
-    .where({
-      familyId,
-      endedAt: _.exists(false),
-      nextRemindTime: _.lte(todayEnd.toISOString()),
-    })
-    .orderBy('nextRemindTime', 'desc')
-    .get();
-
-  // 获取今日确认记录（按家庭查询）
-  const { data: confirmLogs } = await db.collection('confirm_logs')
-    .where({
-      familyId,
-      createdAt: _.gte(todayStart.toISOString()),
-    })
-    .orderBy('createdAt', 'desc')
-    .get();
 
   // 构建操作人映射（用于显示谁完成了事项）
   const confirmByTask = {};
@@ -191,22 +204,12 @@ async function handleTimeline(userId, familyId, babyId) {
     if (!confirmByTask[log.taskId]) {
       confirmByTask[log.taskId] = log;
     }
-    // 收集今日被结束的任务
-    if (log.action === 'ended') {
-      endedTaskIds.add(log.taskId);
-    }
-    // 收集今日被暂停的任务
-    if (log.action === 'paused') {
-      pausedTaskIds.add(log.taskId);
-    }
+    if (log.action === 'ended') endedTaskIds.add(log.taskId);
+    if (log.action === 'paused') pausedTaskIds.add(log.taskId);
   });
 
   // 构建家庭成员映射（用于显示指定负责人）
-  let memberMap = {};
-  const { data: family } = await db.collection('families')
-    .doc(familyId)
-    .get()
-    .catch(() => ({ data: null }));
+  const memberMap = {};
   if (family && family.members) {
     family.members.forEach((m) => {
       memberMap[m.userId] = m;
