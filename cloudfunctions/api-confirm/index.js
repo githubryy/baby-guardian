@@ -81,6 +81,7 @@ async function handleConfirm(userId, familyId, currentUser, data) {
       lastCompletedTime: now,
       lastCompletedBy: userId,
       lastCompletedByName: currentUser.nickName,
+      lastCompletedByAvatar: currentUser.avatarUrl || '',
       lastCompletedByRelation: currentUser.relation || 'other',
       isOverdue: false,
       isPaused: false,
