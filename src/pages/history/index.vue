@@ -95,6 +95,9 @@
       <text>{{ loadingMore ? '加载中...' : '加载更多' }}</text>
     </view>
   </view>
+
+  <!-- 浮动添加按钮 -->
+  <FabButton />
 </template>
 
 <script setup lang="ts">

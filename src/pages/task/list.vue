@@ -34,13 +34,8 @@
     <EmptyState v-if="!loading && taskList.length === 0" uIcon="list-dot" text="还没有提醒事项"
       subText="添加喂养、换尿布、用药等提醒，守护宝宝每一天" actionText="添加事项" @action="goAddTask" />
 
-    <!-- 添加按钮 -->
-    <view class="add-btn-wrap tap-feedback" v-if="taskList.length > 0">
-      <view class="add-btn" @tap="goAddTask">
-        <u-icon name="plus" :size="18" color="#FF7B7B" />
-        <text class="add-text">添加事项</text>
-      </view>
-    </view>
+    <!-- 浮动添加按钮 -->
+    <FabButton />
   </view>
 </template>
 
@@ -136,24 +131,5 @@ function goAddTask() {
 
 .task-list {
   margin-bottom: 24rpx;
-}
-
-.add-btn-wrap {
-  .add-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8rpx;
-    height: 96rpx;
-    background: #fff;
-    border: 2rpx dashed #ff7b7b;
-    border-radius: 24rpx;
-    transition: all 0.2s ease;
-
-    .add-text {
-      font-size: 30rpx;
-      color: #ff7b7b;
-    }
-  }
 }
 </style>

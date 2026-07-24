@@ -144,6 +144,9 @@
     <EmptyState v-if="!loading && periodStats.totalEvents === 0 && summary.totalTasks === 0"
       uIcon="calendar-fill" text="暂无统计数据" subText="添加提醒事项后即可查看统计" />
   </view>
+
+  <!-- 浮动添加按钮 -->
+  <FabButton />
 </template>
 
 <script setup lang="ts">
@@ -183,7 +186,7 @@ watch(activePeriod, () => {
 const chartData = computed(() => {
   return summary.value.weeklyStats.length > 0
     ? summary.value.weeklyStats
-    : getRecentDates(7).map(date => ({ date, totalReminders: 0, completedCount: 0, delayedCount: 0, endedCount: 0, criticallyOverdueCount: 0, newEventCount: 0, completionRate: 0 }));
+    : getRecentDates(7).map(date => ({ date, totalReminders: 0, completedCount: 0, endedCount: 0, criticallyOverdueCount: 0, completionRate: 0 }));
 });
 
 onMounted(() => {
@@ -202,7 +205,7 @@ const periodStats = computed(() => {
     completed: stats.reduce((sum, s) => sum + (s.completedCount || 0), 0),
     ended: stats.reduce((sum, s) => sum + (s.endedCount || 0), 0),
     criticallyOverdue: stats.reduce((sum, s) => sum + (s.criticallyOverdueCount || 0), 0),
-    totalEvents: stats.reduce((sum, s) => sum + (s.newEventCount || 0) + (s.completedCount || 0) + (s.endedCount || 0), 0),
+    totalEvents: stats.reduce((sum, s) => sum + (s.criticallyOverdueCount || 0) + (s.completedCount || 0) + (s.endedCount || 0), 0),
     completionRate: Math.round(stats.reduce((sum, s) => sum + (s.completionRate || 0), 0) / stats.length),
   };
 });

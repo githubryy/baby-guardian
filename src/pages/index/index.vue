@@ -169,9 +169,7 @@
     </scroll-view>
 
     <!-- 浮动添加按钮 -->
-    <view v-if="hasBaby" class="fab tap-feedback" @tap="goAddTask">
-      <u-icon name="plus" :size="28" color="#fff" />
-    </view>
+    <FabButton />
   </view>
 </template>
 
@@ -729,34 +727,6 @@ async function handleStop(item: TimelineItem) {
         color: #2d2d2d;
       }
     }
-  }
-}
-
-/* FAB */
-.fab {
-  position: fixed;
-  right: 40rpx;
-  bottom: 200rpx;
-  width: 104rpx;
-  height: 104rpx;
-  background: linear-gradient(135deg, #ff7b7b, #ff6464);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8rpx 28rpx rgba(255, 123, 123, 0.45);
-  z-index: 99;
-  animation: fab-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-
-@keyframes fab-in {
-  from {
-    opacity: 0;
-    transform: scale(0) rotate(-90deg);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) rotate(0);
   }
 }
 

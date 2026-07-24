@@ -17,7 +17,7 @@
           <text v-if="item.customName" class="custom-name">{{ item.customName }}</text>
         </view>
         <view class="header-tags">
-          <u-tag text="显著" type="error" size="mini" shape="circle" v-if="isCritical" />
+          <u-tag v-if="isCritical" text="显著" type="error" size="mini" shape="circle" plain/>
           <u-tag :text="priorityConfig.name" :type="priorityTagType" size="mini" shape="circle" plain />
           <u-tag v-if="item.taskMode && (item.taskMode === 'recurring')" text="循环" type="error" size="mini"
             shape="circle" />

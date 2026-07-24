@@ -32,7 +32,7 @@ function toDateStr(d) {
 
 /** 创建空的日统计对象 */
 function emptyDayStat(dateStr) {
-  return { date: dateStr, totalReminders: 0, completedCount: 0, delayedCount: 0, endedCount: 0, criticallyOverdueCount: 0, newEventCount: 0, completionRate: 0 };
+  return { date: dateStr, totalReminders: 0, completedCount: 0, endedCount: 0, criticallyOverdueCount: 0, completionRate: 0 };
 }
 
 /** 计算完成率 */
@@ -162,9 +162,7 @@ async function handleSummary(userId, familyId, babyId) {
     if (weekMap[dateKey]) {
       weekMap[dateKey].totalReminders++;
       if (l.action === 'completed') weekMap[dateKey].completedCount++;
-      else if (l.action === 'delayed') weekMap[dateKey].delayedCount++;
       else if (l.action === 'ended') weekMap[dateKey].endedCount++;
-      if (l.completedCount === 0) weekMap[dateKey].newEventCount++;
     }
   });
 
@@ -244,9 +242,7 @@ async function handleDaily(userId, familyId, params) {
     const day = ensureDay(toDateStr(new Date(l.createdAt)));
     day.totalReminders++;
     if (l.action === 'completed') day.completedCount++;
-    else if (l.action === 'delayed') day.delayedCount++;
     else if (l.action === 'ended') day.endedCount++;
-    if (l.completedCount === 0) day.newEventCount++;
   });
 
   overdueEvents.forEach(e => {

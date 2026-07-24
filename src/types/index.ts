@@ -282,11 +282,8 @@ export interface DailyStat {
   date: string;
   totalReminders: number;
   completedCount: number;
-  delayedCount: number;
   endedCount: number;
   criticallyOverdueCount: number;
-  /** 当日新事件数（confirm_log 中 completedCount === 0 的记录数） */
-  newEventCount: number;
   /** 完成率 */
   completionRate: number;
 }
