@@ -300,7 +300,7 @@ async function handleTimeline(userId, familyId, babyId) {
     supplementTasks.forEach((task) => {
       const isRecurring = task.taskMode === 'recurring';
       // 补充任务用 reminder_tasks 字段判断状态（不用 confirm_logs）
-      if (task.endedAt && new Date(task.endedAt) >= todayStart) {
+      if (task.endedAt && new Date(task.endedAt) >= todayStart && !(task.completedCount > 0 && !isRecurring)) {
         timeline.push(buildItem(task, { status: 'ended' }));
       } else if (task.isPaused && (!task.lastCompletedTime || new Date(task.lastCompletedTime) < todayStart)) {
         timeline.push(buildItem(task, { status: 'paused', isRecurring }));
